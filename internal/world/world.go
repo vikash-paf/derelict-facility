@@ -13,3 +13,9 @@ type Tile struct {
 	Type     TileType
 	Walkable bool
 }
+
+type Map struct {
+	Width  int
+	Height int
+	Tiles  []Tile
+}
