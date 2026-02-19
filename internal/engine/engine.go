@@ -2,12 +2,18 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
+)
+
+const (
+	cursorHome = "\033[H"
+	lineBreak  = "\r\n"
 )
 
 type Engine struct {
@@ -48,7 +54,7 @@ func (e *Engine) Run() error {
 		e.screen.Reset()
 
 		// move the cursor to the top left
-		e.screen.WriteString("\033[H")
+		e.screen.WriteString(cursorHome)
 
 		// spawn the player
 		for y := 0; y < height; y++ {
@@ -69,11 +75,10 @@ func (e *Engine) Run() error {
 		select {
 		case event := <-inputChan:
 			e.handleInput(event)
-		default:
-			// todo: add fps limit (sleep here)
+		case <-ticker.C:
+			// todo: other logic here, like other characters moving around
+			e.render()
 		}
-
-		time.Sleep(16 * time.Millisecond) // ~60FPS
 	}
 
 	return nil
@@ -115,4 +120,41 @@ func (e *Engine) movePlayer(x, y int) {
 		e.Player.X = newX
 		e.Player.Y = newY
 	}
+}
+
+func (e *Engine) render() {
+	e.screen.Reset()
+	e.screen.WriteString(cursorHome)
+
+	for y := 0; y < e.Map.Height; y++ {
+		for x := 0; x < e.Map.Width; x++ {
+			// 1. Render the player
+			if e.Player.X == x && e.Player.Y == y {
+				e.screen.WriteRune(e.Player.Char)
+				continue
+			}
+
+			// 2. Render the map tiles
+			tile := e.Map.GetTile(x, y)
+			if tile == nil {
+				continue
+			}
+
+			switch tile.Type {
+			case world.TileTypeWall:
+				e.screen.WriteString("#")
+			case world.TileTypeFloor:
+				e.screen.WriteString(".")
+			case world.TileTypeEmpty:
+				e.screen.WriteString(" ")
+			default:
+				panic(fmt.Sprintf("unknown tile type: %d", tile.Type))
+			}
+		}
+
+		e.screen.WriteString(lineBreak)
+	}
+
+	// Render the screen
+	os.Stdout.Write(e.screen.Bytes())
 }
