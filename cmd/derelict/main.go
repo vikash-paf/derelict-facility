@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"os"
 	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/entity"
@@ -54,7 +54,7 @@ func main() {
 			screen.WriteString("\r\n") // In raw mode, \n just moves down, \r moves to start of line
 		}
 
-		fmt.Print(screen.String())
+		os.Stdout.Write(screen.Bytes())
 
 		// handle input and move player
 		select {
