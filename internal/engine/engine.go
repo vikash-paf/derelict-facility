@@ -2,20 +2,29 @@ package engine
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
+	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
-// Engine manages the game loop and time management
 type Engine struct {
-	term *terminal.Terminal
-	// Add other dependencies: world, entities
+	Terminal *terminal.Terminal
+	Map      *world.Map
+	Player   *entity.Actor
+
+	Running    bool
+	TickerRate time.Duration
 }
 
-// New creates a new engine instance
-func New(term *terminal.Terminal) *Engine {
+func NewEngine(term *terminal.Terminal, width, height int) *Engine {
 	return &Engine{
-		term: term,
+		Terminal:   term,
+		Map:        world.NewMap(width, height),
+		Player:     entity.NewActor(width/2, height/2, '@'),
+		Running:    true,
+		TickerRate: time.Millisecond * 33, // ~30 fps
 	}
 }
 
