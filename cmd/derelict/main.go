@@ -25,14 +25,14 @@ func main() {
 	}
 
 	// Draw a simple box of walls around the edges
-	for x := 0; x < 80; x++ {
+	for x := 0; x < width; x++ {
 		gameEngine.Map.SetTile(x, 0, world.Tile{Type: world.TileTypeWall, Walkable: false})
-		gameEngine.Map.SetTile(x, 24, world.Tile{Type: world.TileTypeWall, Walkable: false})
+		gameEngine.Map.SetTile(x, height-1, world.Tile{Type: world.TileTypeWall, Walkable: false})
 	}
 
-	for y := 0; y < 25; y++ {
+	for y := 0; y < height; y++ {
 		gameEngine.Map.SetTile(0, y, world.Tile{Type: world.TileTypeWall, Walkable: false})
-		gameEngine.Map.SetTile(79, y, world.Tile{Type: world.TileTypeWall, Walkable: false})
+		gameEngine.Map.SetTile(width-1, y, world.Tile{Type: world.TileTypeWall, Walkable: false})
 	}
 
 	err = gameEngine.Run()
