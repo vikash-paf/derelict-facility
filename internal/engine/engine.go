@@ -45,33 +45,11 @@ func NewEngine(term *terminal.Terminal, width, height int) *Engine {
 // Run starts the deterministic game loop
 func (e *Engine) Run() error {
 	inputChan := e.Terminal.PollInput()
+	
 	ticker := time.NewTicker(e.TickerRate)
 	defer ticker.Stop()
 
-	width, height := e.Map.Width, e.Map.Height
-
 	for e.Running {
-		e.screen.Reset()
-
-		// move the cursor to the top left
-		e.screen.WriteString(cursorHome)
-
-		// spawn the player
-		for y := 0; y < height; y++ {
-			for x := 0; x < width; x++ {
-				if e.Player.X == x && e.Player.Y == y {
-					e.screen.WriteRune(e.Player.Char)
-				} else {
-					e.screen.WriteString(".")
-				}
-			}
-
-			e.screen.WriteString("\r\n") // In raw mode, \n just moves down, \r moves to start of line
-		}
-
-		os.Stdout.Write(e.screen.Bytes())
-
-		// handle input and move player
 		select {
 		case event := <-inputChan:
 			e.handleInput(event)
