@@ -17,16 +17,23 @@ type Engine struct {
 
 	Running    bool
 	TickerRate time.Duration
+	screen     bytes.Buffer
 }
 
 func NewEngine(term *terminal.Terminal, width, height int) *Engine {
-	return &Engine{
+	e := &Engine{
 		Terminal:   term,
 		Map:        world.NewMap(width, height),
-		Player:     entity.NewActor(width/2, height/2, '@'),
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 	}
+
+	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
+	e.screen.Grow(memorySize)
+
+	e.Player = entity.NewActor(width/2, height/2, '@')
+
+	return e
 }
 
 // Run starts the deterministic game loop
@@ -36,29 +43,27 @@ func (e *Engine) Run() error {
 	defer ticker.Stop()
 
 	width, height := e.Map.Width, e.Map.Height
-	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
-	screen := bytes.NewBuffer(make([]byte, 0, memorySize))
 
 	for e.Running {
-		screen.Reset()
+		e.screen.Reset()
 
 		// move the cursor to the top left
-		screen.WriteString("\033[H")
+		e.screen.WriteString("\033[H")
 
 		// spawn the player
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
 				if e.Player.X == x && e.Player.Y == y {
-					screen.WriteRune(e.Player.Char)
+					e.screen.WriteRune(e.Player.Char)
 				} else {
-					screen.WriteString(".")
+					e.screen.WriteString(".")
 				}
 			}
 
-			screen.WriteString("\r\n") // In raw mode, \n just moves down, \r moves to start of line
+			e.screen.WriteString("\r\n") // In raw mode, \n just moves down, \r moves to start of line
 		}
 
-		os.Stdout.Write(screen.Bytes())
+		os.Stdout.Write(e.screen.Bytes())
 
 		// handle input and move player
 		select {
