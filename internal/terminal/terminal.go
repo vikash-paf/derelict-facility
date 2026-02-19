@@ -46,3 +46,7 @@ func (t *Terminal) Restore() {
 
 	fmt.Print(showCursor)
 }
+
+func NewTerminal() *Terminal {
+	return &Terminal{}
+}
