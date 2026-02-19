@@ -11,6 +11,10 @@ const hideCursor = "\033[?25l"
 const showCursor = "\033[?25h"
 const clearScreen = "\033[2J\033[H"
 
+func NewTerminal() *Terminal {
+	return &Terminal{}
+}
+
 type Terminal struct {
 	oldState *term.State
 }
@@ -56,6 +60,16 @@ func (t *Terminal) Clear() {
 	fmt.Print(clearScreen)
 }
 
-func NewTerminal() *Terminal {
-	return &Terminal{}
+func (t *Terminal) PollInput() <-chan InputEvent {
+	// constantly poll for new input key
+
+	// TODO: implement polling logic
+
+	return nil
+}
+
+type InputEvent struct {
+	Key rune
+	// we only care about alpha-numeric keys, not special keys like arrows, esc etc.
+	// They will be added later.
 }
