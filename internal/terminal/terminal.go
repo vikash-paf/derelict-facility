@@ -61,11 +61,17 @@ func (t *Terminal) Clear() {
 }
 
 func (t *Terminal) PollInput() <-chan InputEvent {
-	// constantly poll for new input key
+	events := make(chan InputEvent, 10)
 
-	// TODO: implement polling logic
+	go func() {
+		for {
+			b := make([]byte, 1)
+			os.Stdin.Read(b)
+			events <- InputEvent{rune(b[0])}
+		}
+	}()
 
-	return nil
+	return events
 }
 
 type InputEvent struct {
