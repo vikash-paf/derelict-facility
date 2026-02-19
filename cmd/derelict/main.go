@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/entity"
@@ -29,23 +30,30 @@ func main() {
 
 	inputChan := term.PollInput()
 
+	var screen strings.Builder
+
 	running := true
 
 	for running {
-		term.Clear()
+		screen.Reset()
+
+		// move the cursor to the top left
+		screen.WriteString("\033[H")
 
 		// spawn the player
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
 				if player.X == x && player.Y == y {
-					fmt.Printf("%c", player.Char)
+					screen.WriteRune(player.Char)
 				} else {
-					fmt.Printf(".")
+					screen.WriteString(".")
 				}
 			}
 
-			fmt.Print("\r\n") // In raw mode, \n just moves down, \r moves to start of line
+			screen.WriteString("\r\n") // In raw mode, \n just moves down, \r moves to start of line
 		}
+
+		fmt.Print(screen.String())
 
 		// handle input and move player
 		select {
