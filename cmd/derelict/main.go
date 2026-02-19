@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"os"
-	"time"
+	"fmt"
 
-	"github.com/vikash-paf/derelict-facility/internal/entity"
+	"github.com/vikash-paf/derelict-facility/internal/engine"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -18,9 +16,6 @@ func main() {
 		gameMap.Tiles[i] = world.Tile{Type: world.TileTypeFloor, Walkable: true}
 	}
 
-	// create the player
-	player := entity.NewActor(10, 10, '@')
-
 	term := terminal.NewTerminal()
 	err := term.EnableRawMode()
 	if err != nil {
@@ -28,53 +23,9 @@ func main() {
 	}
 	defer term.Restore()
 
-	inputChan := term.PollInput()
-
-	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
-	screen := bytes.NewBuffer(make([]byte, 0, memorySize))
-
-	running := true
-
-	for running {
-		screen.Reset()
-
-		// move the cursor to the top left
-		screen.WriteString("\033[H")
-
-		// spawn the player
-		for y := 0; y < height; y++ {
-			for x := 0; x < width; x++ {
-				if player.X == x && player.Y == y {
-					screen.WriteRune(player.Char)
-				} else {
-					screen.WriteString(".")
-				}
-			}
-
-			screen.WriteString("\r\n") // In raw mode, \n just moves down, \r moves to start of line
-		}
-
-		os.Stdout.Write(screen.Bytes())
-
-		// handle input and move player
-		select {
-		case event := <-inputChan:
-			switch event.Key {
-			case 'w':
-				player.Y--
-			case 's':
-				player.Y++
-			case 'a':
-				player.X--
-			case 'd':
-				player.X++
-			case 'q':
-				running = false
-			}
-		default:
-			// todo: add fps limit (sleep here)
-		}
-
-		time.Sleep(16 * time.Millisecond) // ~60FPS
+	gameEngine := engine.NewEngine(term, width, height)
+	err = gameEngine.Run()
+	if err != nil {
+		fmt.Errorf(err.Error())
 	}
 }

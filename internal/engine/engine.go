@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"time"
 
@@ -72,7 +71,6 @@ func (e *Engine) Run() error {
 		time.Sleep(16 * time.Millisecond) // ~60FPS
 	}
 
-	fmt.Println("Engine running...")
 	return nil
 }
 
