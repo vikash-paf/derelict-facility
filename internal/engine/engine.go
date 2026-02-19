@@ -96,6 +96,18 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 }
 
 func (e *Engine) movePlayer(x, y int) {
-	e.Player.X = x
-	e.Player.Y = y
+	newX := e.Player.X + x
+	newY := e.Player.Y + y
+
+	// if outside the map, do nothing
+	if newX < 0 || newX >= e.Map.Width || newY < 0 || newY >= e.Map.Height {
+		return
+	}
+
+	// check if the tile is walkable
+	tile := e.Map.GetTile(newX, newY)
+	if tile != nil && tile.Walkable {
+		e.Player.X = newX
+		e.Player.Y = newY
+	}
 }
