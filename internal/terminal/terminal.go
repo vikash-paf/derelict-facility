@@ -9,6 +9,7 @@ import (
 
 const hideCursor = "\033[?25l"
 const showCursor = "\033[?25h"
+const clearScreen = "\033[2J\033[H"
 
 type Terminal struct {
 	oldState *term.State
@@ -45,6 +46,10 @@ func (t *Terminal) Restore() {
 	}
 
 	fmt.Print(showCursor)
+}
+
+func (t *Terminal) Clear() {
+	fmt.Print(clearScreen)
 }
 
 func NewTerminal() *Terminal {

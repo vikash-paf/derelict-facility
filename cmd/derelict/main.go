@@ -22,5 +22,7 @@ func main() {
 	}
 	defer term.Restore()
 
+	term.Clear()
+
 	fmt.Println("Starting derelict-facility engine...")
 }
