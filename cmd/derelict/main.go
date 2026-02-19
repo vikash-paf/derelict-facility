@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/entity"
@@ -30,7 +30,8 @@ func main() {
 
 	inputChan := term.PollInput()
 
-	var screen strings.Builder
+	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
+	screen := bytes.NewBuffer(make([]byte, 0, memorySize))
 
 	running := true
 
