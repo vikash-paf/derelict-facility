@@ -45,7 +45,7 @@ func NewEngine(term *terminal.Terminal, width, height int) *Engine {
 // Run starts the deterministic game loop
 func (e *Engine) Run() error {
 	inputChan := e.Terminal.PollInput()
-	
+
 	ticker := time.NewTicker(e.TickerRate)
 	defer ticker.Stop()
 

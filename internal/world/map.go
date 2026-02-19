@@ -9,6 +9,10 @@ type Map struct {
 	Tiles []Tile
 }
 
+func (m *Map) SetTile(x, y int, tile Tile) {
+	m.Tiles[x+y*m.Width] = tile
+}
+
 func (m *Map) GetTile(x, y int) *Tile {
 	if x < 0 || x >= m.Width || y < 0 || y >= m.Height {
 		return nil

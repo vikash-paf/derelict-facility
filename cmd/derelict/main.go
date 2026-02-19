@@ -24,6 +24,13 @@ func main() {
 	defer term.Restore()
 
 	gameEngine := engine.NewEngine(term, width, height)
+
+	// Draw a simple box of walls around the edges
+	for x := 0; x < 80; x++ {
+		gameEngine.Map.SetTile(x, 0, world.Tile{Type: world.TileTypeWall, Walkable: false})
+		gameEngine.Map.SetTile(x, 23, world.Tile{Type: world.TileTypeWall, Walkable: false})
+	}
+
 	err = gameEngine.Run()
 	if err != nil {
 		fmt.Errorf(err.Error())
