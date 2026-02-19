@@ -75,16 +75,27 @@ func (e *Engine) Run() error {
 }
 
 func (e *Engine) handleInput(event terminal.InputEvent) {
+	dx, dy := 0, 0
+
 	switch event.Key {
 	case 'w':
-		e.Player.Y--
+		dy = -1
 	case 's':
-		e.Player.Y++
+		dy = 1
 	case 'a':
-		e.Player.X--
+		dx = -1
 	case 'd':
-		e.Player.X++
+		dx = 1
 	case 'q':
 		e.Running = false
 	}
+
+	if dx != 0 || dy != 0 {
+		e.movePlayer(dx, dy)
+	}
+}
+
+func (e *Engine) movePlayer(x, y int) {
+	e.Player.X = x
+	e.Player.Y = y
 }
