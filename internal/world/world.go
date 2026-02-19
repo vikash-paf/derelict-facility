@@ -4,7 +4,6 @@ type TileType uint8
 
 const (
 	TileTypeEmpty TileType = iota
-	TileTypePlayer
 	TileTypeWall
 	TileTypeFloor
 )
