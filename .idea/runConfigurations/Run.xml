@@ -10,6 +10,7 @@
     <package value="github.com/vikash-paf/derelict-facility" />
     <directory value="$PROJECT_DIR$/cmd/derelict" />
     <filePath value="$PROJECT_DIR$" />
+    <pty_enabled value="true" />
     <method v="2" />
   </configuration>
 </component>
