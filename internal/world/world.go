@@ -17,5 +17,5 @@ type Tile struct {
 type Map struct {
 	Width  int
 	Height int
-	Tiles  []Tile
+	Tiles  []Tile // keeping this as a single slice for now, this will store the location, it's continuous "tape"
 }
