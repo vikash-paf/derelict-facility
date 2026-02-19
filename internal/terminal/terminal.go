@@ -24,6 +24,10 @@ func (t *Terminal) EnableRawMode() error {
 
 	fd := int(os.Stdin.Fd())
 
+	if !term.IsTerminal(fd) {
+		return fmt.Errorf("stdin is not a terminal (run this in a real shell, not an IDE output tab)")
+	}
+
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		return err
