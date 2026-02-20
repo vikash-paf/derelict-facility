@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -18,7 +17,7 @@ const (
 type Engine struct {
 	Terminal *terminal.Terminal
 	Map      *world.Map
-	Player   *entity.Actor
+	Player   *world.Player
 
 	Theme world.TileVariant
 
@@ -43,7 +42,7 @@ func NewEngine(
 	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
 	e.screen.Grow(memorySize)
 
-	e.Player = entity.NewActor(width/2, height/2, '@')
+	e.Player = world.NewPlayer(width/2, height/2, world.PlayerStatusHealthy)
 
 	return e
 }
@@ -114,7 +113,7 @@ func (e *Engine) render() {
 		for x := 0; x < e.Map.Width; x++ {
 			// 1. Render the player
 			if e.Player.X == x && e.Player.Y == y {
-				e.screen.WriteRune(e.Player.Char)
+				e.screen.WriteString(e.Player.Render())
 				continue
 			}
 

@@ -3,10 +3,14 @@ package world
 type PlayerStatus int
 
 const (
-	StatusHealthy PlayerStatus = iota
-	StatusSick
-	StatusHurt
+	PlayerStatusHealthy PlayerStatus = iota
+	PlayerStatusSick
+	PlayerStatusHurt
 )
+
+func NewPlayer(x, y int, status PlayerStatus) *Player {
+	return &Player{x, y, status}
+}
 
 type Player struct {
 	X, Y   int
@@ -15,10 +19,10 @@ type Player struct {
 
 func (p *Player) Render() string {
 	switch p.Status {
-	case StatusSick:
+	case PlayerStatusSick:
 		// A sickly, toxic green
 		return Green + "@" + Reset
-	case StatusHurt:
+	case PlayerStatusHurt:
 		// A flashing red warning
 		return Red + "@" + Reset
 	default:
