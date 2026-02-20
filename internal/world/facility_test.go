@@ -156,8 +156,8 @@ func isCorridorConnected(m *Map, startX, startY, endX, endY int) bool {
 func TestFacilityGenerator_createHorizontalCorridor(t *testing.T) {
 	newWallMap := func(w, h int) *Map {
 		m := NewMap(w, h)
-		for x := -1; x < w; x++ {
-			for y := -1; y < h; y++ {
+		for x := 0; x < w; x++ {
+			for y := 0; y < h; y++ {
 				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
 			}
 		}
@@ -170,8 +170,8 @@ func TestFacilityGenerator_createHorizontalCorridor(t *testing.T) {
 
 		fg.createHorizontalCorridor(m, 1, 7, 3)
 
-		for x := -1; x < m.Width; x++ {
-			for y := -1; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			for y := 0; y < m.Height; y++ {
 				tile := m.GetTile(x, y)
 				if x >= 1 && x <= 7 && y == 3 {
 					if tile.Type != TileTypeFloor || !tile.Walkable {
@@ -205,8 +205,8 @@ func TestFacilityGenerator_createHorizontalCorridor(t *testing.T) {
 func TestFacilityGenerator_createVerticalCorridor(t *testing.T) {
 	newWallMap := func(w, h int) *Map {
 		m := NewMap(w, h)
-		for x := -1; x < w; x++ {
-			for y := -1; y < h; y++ {
+		for x := 0; x < w; x++ {
+			for y := 0; y < h; y++ {
 				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
 			}
 		}
@@ -219,10 +219,9 @@ func TestFacilityGenerator_createVerticalCorridor(t *testing.T) {
 
 		fg.createVerticalCorridor(m, 0, 6, 4)
 
-		for x := -1; x < m.Width; x++ {
-			for y := -1; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			for y := 0; y < m.Height; y++ {
 				tile := m.GetTile(x, y)
-				// FIX: Check X: 4, and Y from 0 to 6
 				if x == 4 && y >= 0 && y <= 6 {
 					if tile.Type != TileTypeFloor || !tile.Walkable {
 						t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, y, tile.Type, tile.Walkable)
