@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/engine"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
@@ -20,20 +21,13 @@ func main() {
 
 	gameEngine := engine.NewEngine(term, width, height)
 
-	for i := 0; i < width*height; i++ {
-		gameEngine.Map.Tiles[i] = world.Tile{Type: world.TileTypeFloor, Walkable: true}
-	}
+	seed := time.Now().UnixNano()
+	generator := world.NewFacilityGenerator(uint64(seed))
 
-	// Draw a simple box of walls around the edges
-	for x := 0; x < width; x++ {
-		gameEngine.Map.SetTile(x, 0, world.Tile{Type: world.TileTypeWall, Walkable: false})
-		gameEngine.Map.SetTile(x, height-1, world.Tile{Type: world.TileTypeWall, Walkable: false})
-	}
-
-	for y := 0; y < height; y++ {
-		gameEngine.Map.SetTile(0, y, world.Tile{Type: world.TileTypeWall, Walkable: false})
-		gameEngine.Map.SetTile(width-1, y, world.Tile{Type: world.TileTypeWall, Walkable: false})
-	}
+	generatedMap, playerX, playerY := generator.Generate(width, height)
+	gameEngine.Map = generatedMap
+	gameEngine.Player.X = playerX
+	gameEngine.Player.Y = playerY
 
 	err = gameEngine.Run()
 	if err != nil {
