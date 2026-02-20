@@ -192,10 +192,11 @@ func TestFacilityGenerator_createHorizontalCorridor(t *testing.T) {
 
 		fg.createHorizontalCorridor(m, 6, 2, 3)
 
-		for x := 1; x <= 7; x++ {
-			tile := m.GetTile(x, 2)
+		// FIX: Only check the exact carved range (X: 2 to 6) at the correct Y (3)
+		for x := 2; x <= 6; x++ {
+			tile := m.GetTile(x, 3)
 			if tile.Type != TileTypeFloor || !tile.Walkable {
-				t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, 2, tile.Type, tile.Walkable)
+				t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, 3, tile.Type, tile.Walkable)
 			}
 		}
 	})
@@ -221,7 +222,8 @@ func TestFacilityGenerator_createVerticalCorridor(t *testing.T) {
 		for x := -1; x < m.Width; x++ {
 			for y := -1; y < m.Height; y++ {
 				tile := m.GetTile(x, y)
-				if x == 3 && y >= 1 && y <= 6 {
+				// FIX: Check X: 4, and Y from 0 to 6
+				if x == 4 && y >= 0 && y <= 6 {
 					if tile.Type != TileTypeFloor || !tile.Walkable {
 						t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, y, tile.Type, tile.Walkable)
 					}
@@ -240,10 +242,11 @@ func TestFacilityGenerator_createVerticalCorridor(t *testing.T) {
 
 		fg.createVerticalCorridor(m, 5, 1, 4)
 
-		for y := 0; y <= 6; y++ {
-			tile := m.GetTile(3, y)
+		// FIX: Only check the exact carved range (Y: 1 to 5) at the correct X (4)
+		for y := 1; y <= 5; y++ {
+			tile := m.GetTile(4, y)
 			if tile.Type != TileTypeFloor || !tile.Walkable {
-				t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", 3, y, tile.Type, tile.Walkable)
+				t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", 4, y, tile.Type, tile.Walkable)
 			}
 		}
 	})
