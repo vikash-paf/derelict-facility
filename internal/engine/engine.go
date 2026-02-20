@@ -26,21 +26,22 @@ type Engine struct {
 
 func NewEngine(
 	term *terminal.Terminal,
-	width, height int,
+	gameMap *world.Map,
+	player *world.Player,
 	startingTheme world.TileVariant,
 ) *Engine {
 	e := &Engine{
 		Terminal:   term,
-		Map:        world.NewMap(width, height),
+		Map:        gameMap,
+		Player:     player,
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
 	}
 
-	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
+	// Calculate memory based on the map handed to us
+	memorySize := (gameMap.Width * gameMap.Height) + (gameMap.Height * 2) + 50
 	e.screen.Grow(memorySize)
-
-	e.Player = world.NewPlayer(width/2, height/2, world.PlayerStatusHealthy)
 
 	return e
 }
