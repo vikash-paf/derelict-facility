@@ -6,8 +6,9 @@ type Rect struct {
 }
 
 func (r *Rect) Center() (x, y int) {
-	// todo:  calculate the center of the rectangle
-	return
+	x = (r.X1 + r.X2) / 2
+	y = (r.Y1 + r.Y2) / 2
+	return x, y
 }
 
 func (r *Rect) Width() int {
