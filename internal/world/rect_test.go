@@ -75,3 +75,46 @@ func TestRect_Intersects(t *testing.T) {
 		})
 	}
 }
+
+func TestRect_Center(t *testing.T) {
+	tests := []struct {
+		name  string
+		r     Rect
+		wantX int
+		wantY int
+	}{
+		{
+			name:  "odd span centered",
+			r:     Rect{X1: 0, Y1: 0, X2: 9, Y2: 9},
+			wantX: 4,
+			wantY: 4,
+		},
+		{
+			name:  "even span uses integer division",
+			r:     Rect{X1: 0, Y1: 0, X2: 10, Y2: 10},
+			wantX: 5,
+			wantY: 5,
+		},
+		{
+			name:  "negative coordinates",
+			r:     Rect{X1: -10, Y1: -6, X2: -2, Y2: 4},
+			wantX: -6,
+			wantY: -1,
+		},
+		{
+			name:  "mixed coordinates",
+			r:     Rect{X1: -3, Y1: 2, X2: 4, Y2: 9},
+			wantX: 0,
+			wantY: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotX, gotY := tt.r.Center()
+			if gotX != tt.wantX || gotY != tt.wantY {
+				t.Fatalf("Center() = (%d,%d), want (%d,%d) for rect=%+v", gotX, gotY, tt.wantX, tt.wantY, tt.r)
+			}
+		})
+	}
+}

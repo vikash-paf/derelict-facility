@@ -152,3 +152,99 @@ func isCorridorConnected(m *Map, startX, startY, endX, endY int) bool {
 
 	return false
 }
+
+func TestFacilityGenerator_createHorizontalCorridor(t *testing.T) {
+	newWallMap := func(w, h int) *Map {
+		m := NewMap(w, h)
+		for x := -1; x < w; x++ {
+			for y := -1; y < h; y++ {
+				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
+			}
+		}
+		return m
+	}
+
+	t.Run("carves left-to-right inclusive", func(t *testing.T) {
+		fg := NewFacilityGenerator(0)
+		m := newWallMap(9, 6)
+
+		fg.createHorizontalCorridor(m, 1, 7, 3)
+
+		for x := -1; x < m.Width; x++ {
+			for y := -1; y < m.Height; y++ {
+				tile := m.GetTile(x, y)
+				if x >= 1 && x <= 7 && y == 3 {
+					if tile.Type != TileTypeFloor || !tile.Walkable {
+						t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, y, tile.Type, tile.Walkable)
+					}
+				} else {
+					if tile.Type != TileTypeWall || tile.Walkable {
+						t.Fatalf("expected wall+non-walkable at (%d,%d), got type=%v walkable=%v", x, y, tile.Type, tile.Walkable)
+					}
+				}
+			}
+		}
+	})
+
+	t.Run("carves right-to-left by swapping x0/x2", func(t *testing.T) {
+		fg := NewFacilityGenerator(0)
+		m := newWallMap(9, 6)
+
+		fg.createHorizontalCorridor(m, 6, 2, 3)
+
+		for x := 1; x <= 7; x++ {
+			tile := m.GetTile(x, 2)
+			if tile.Type != TileTypeFloor || !tile.Walkable {
+				t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, 2, tile.Type, tile.Walkable)
+			}
+		}
+	})
+}
+
+func TestFacilityGenerator_createVerticalCorridor(t *testing.T) {
+	newWallMap := func(w, h int) *Map {
+		m := NewMap(w, h)
+		for x := -1; x < w; x++ {
+			for y := -1; y < h; y++ {
+				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
+			}
+		}
+		return m
+	}
+
+	t.Run("carves top-to-bottom inclusive", func(t *testing.T) {
+		fg := NewFacilityGenerator(0)
+		m := newWallMap(7, 10)
+
+		fg.createVerticalCorridor(m, 0, 6, 4)
+
+		for x := -1; x < m.Width; x++ {
+			for y := -1; y < m.Height; y++ {
+				tile := m.GetTile(x, y)
+				if x == 3 && y >= 1 && y <= 6 {
+					if tile.Type != TileTypeFloor || !tile.Walkable {
+						t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", x, y, tile.Type, tile.Walkable)
+					}
+				} else {
+					if tile.Type != TileTypeWall || tile.Walkable {
+						t.Fatalf("expected wall+non-walkable at (%d,%d), got type=%v walkable=%v", x, y, tile.Type, tile.Walkable)
+					}
+				}
+			}
+		}
+	})
+
+	t.Run("carves bottom-to-top by swapping y0/y2", func(t *testing.T) {
+		fg := NewFacilityGenerator(0)
+		m := newWallMap(7, 10)
+
+		fg.createVerticalCorridor(m, 5, 1, 4)
+
+		for y := 0; y <= 6; y++ {
+			tile := m.GetTile(3, y)
+			if tile.Type != TileTypeFloor || !tile.Walkable {
+				t.Fatalf("expected floor+walkable at (%d,%d), got type=%v walkable=%v", 3, y, tile.Type, tile.Walkable)
+			}
+		}
+	})
+}
