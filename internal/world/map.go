@@ -7,6 +7,7 @@ type Map struct {
 	// keeping this as a single slice for now,
 	// this will store the location, it's continuous "tape", better performance and low memory usage
 	Tiles []Tile
+	Rooms []Rect
 }
 
 func (m *Map) SetTile(x, y int, tile Tile) {
