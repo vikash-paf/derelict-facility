@@ -92,3 +92,15 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	// 3. return the map and the player position (center of the first room)
 	return m, playerX, playerY
 }
+
+func (f FacilityGenerator) createHorizontalCorridor(m *Map, x1, x2, y int) {
+	for x := x1; x <= x2; x++ {
+		m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
+	}
+}
+
+func (f FacilityGenerator) createVerticalCorridor(m *Map, y1, y2, x int) {
+	for y := y1; y <= y2; y++ {
+		m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
+	}
+}
