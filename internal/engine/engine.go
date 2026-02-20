@@ -58,8 +58,8 @@ func (e *Engine) Run() error {
 		case event := <-inputChan:
 			e.handleInput(event)
 		case <-ticker.C:
-			// todo: other logic here, like other characters moving around
-			e.render()
+			e.Update() // Calculate all game rules!
+			e.render() // Paint the results!
 		}
 	}
 
@@ -136,4 +136,13 @@ func (e *Engine) render() {
 
 	// Render the screen
 	os.Stdout.Write(e.screen.Bytes())
+}
+
+func (e *Engine) Update() {
+	// Right now, this is empty!
+	// But tomorrow, this is where I will add:
+	// - Check if the player stepped on a checkpoint
+	// - Move enemies
+	// - Trigger story events
+	// - Update flashing light animations
 }
