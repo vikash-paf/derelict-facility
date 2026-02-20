@@ -37,6 +37,6 @@ func main() {
 
 	err = gameEngine.Run()
 	if err != nil {
-		fmt.Errorf(err.Error())
+		fmt.Println(err)
 	}
 }
