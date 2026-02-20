@@ -107,6 +107,9 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	// 2.1 carve the rooms
 	// 2.2 connect the rooms (l-corridors)
 	// 3. return the map and the player position (center of the first room)
+
+	m.Rooms = rooms
+
 	return m, playerX, playerY
 }
 
