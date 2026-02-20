@@ -19,6 +19,12 @@ func main() {
 	}
 	defer term.Restore()
 
+	// get the terminal size and use that for the map
+	width, height, err = term.GetSize()
+	if err != nil {
+		panic(err)
+	}
+
 	gameEngine := engine.NewEngine(term, width, height, world.TileVariantSolid)
 
 	seed := time.Now().UnixNano()

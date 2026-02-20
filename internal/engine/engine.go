@@ -68,6 +68,11 @@ func (e *Engine) Run() error {
 func (e *Engine) handleInput(event terminal.InputEvent) {
 	dx, dy := 0, 0
 
+	if event.Quit {
+		e.Running = false
+		return
+	}
+
 	switch event.Key {
 	case 'w':
 		dy = -1
@@ -79,6 +84,7 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 		dx = 1
 	case 'q':
 		e.Running = false
+		return
 	}
 
 	if dx != 0 || dy != 0 {
