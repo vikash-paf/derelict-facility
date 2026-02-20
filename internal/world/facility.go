@@ -22,7 +22,7 @@ type FacilityGenerator struct {
 	rng  *rand.Rand // random number generator
 }
 
-func (f FacilityGenerator) randomBetween(min, max int) int {
+func (f *FacilityGenerator) randomBetween(min, max int) int {
 	spread := max - min + 1
 	return f.rng.IntN(spread) + min
 }
@@ -46,8 +46,17 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		rWidth := f.randomBetween(roomMinSize, roomMaxSize)
 		rHeight := f.randomBetween(roomMinSize, roomMaxSize)
 
-		x := f.randomBetween(1, width-rWidth-1)
-		y := f.randomBetween(1, height-rHeight-1)
+		maxX := width - rWidth - 1
+		maxY := height - rHeight - 1
+
+		// If the max is less than 0, the room is too big to fit.
+		// Skip this attempt and try rolling a new room!
+		if maxX < 0 || maxY < 0 {
+			continue
+		}
+
+		x := f.randomBetween(0, maxX)
+		y := f.randomBetween(0, maxY)
 
 		room := Rect{X1: x, Y1: y, X2: x + rWidth, Y2: y + rHeight}
 

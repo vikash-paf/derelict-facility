@@ -65,17 +65,27 @@ func TestFacilityGenerator_Generate(t *testing.T) {
 			}
 
 			countWalls := 0
+			walkableTiles := 0
 			for x := 0; x < m.Width; x++ {
 				for y := 0; y < m.Height; y++ {
 					tile := m.GetTile(x, y)
 					if tile.Type == TileTypeWall && !tile.Walkable {
 						countWalls++
+					} else if tile.Walkable {
+						walkableTiles++
 					}
 				}
 			}
+			if walkableTiles != (m.Width*m.Height - countWalls) {
+				t.Fatalf("Walkable tile count (%d) does not match expected value (%d)", walkableTiles, m.Width*m.Height-countWalls)
+			}
 
-			if countWalls != tc.expectedWalls {
-				t.Fatalf("Expected %d wall tiles, but counted %d", tc.expectedWalls, countWalls)
+			expectedWalls := tc.width * tc.height
+			for _, room := range m.Rooms {
+				expectedWalls -= room.Width() * room.Height()
+			}
+			if countWalls != expectedWalls {
+				t.Fatalf("Expected %d wall tiles after room carving, but counted %d", expectedWalls, countWalls)
 			}
 
 			if px != 0 || py != 0 {
