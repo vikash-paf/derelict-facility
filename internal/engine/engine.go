@@ -42,7 +42,7 @@ func NewEngine(
 	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
 	e.screen.Grow(memorySize)
 
-	e.Player = world.NewPlayer(width/2, height/2, world.PlayerStatusHealthy)
+	e.Player = world.NewPlayer(width/2, height/2, world.PlayerStatusHurt)
 
 	return e
 }
