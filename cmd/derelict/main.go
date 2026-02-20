@@ -19,7 +19,7 @@ func main() {
 	}
 	defer term.Restore()
 
-	gameEngine := engine.NewEngine(term, width, height)
+	gameEngine := engine.NewEngine(term, width, height, world.TileVariantCold)
 
 	seed := time.Now().UnixNano()
 	generator := world.NewFacilityGenerator(uint64(seed))

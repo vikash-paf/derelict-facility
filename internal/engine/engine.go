@@ -126,39 +126,12 @@ func (e *Engine) render() {
 			}
 
 			switch tile.Type {
-
-			// v0
-			// case world.TileTypeWall:
-			// 	e.screen.WriteString("#")
-			// case world.TileTypeFloor:
-			// 	e.screen.WriteString("·")
-			// case world.TileTypeEmpty:
-			// 	e.screen.WriteString(" ")
-
-			// v1
 			case world.TileTypeWall:
 				e.screen.WriteString("█")
 			case world.TileTypeFloor:
 				e.screen.WriteString("·")
 			case world.TileTypeEmpty:
 				e.screen.WriteString(" ")
-
-			// v2
-			// case world.TileTypeWall:
-			// 	e.screen.WriteString("▓")
-			// case world.TileTypeFloor:
-			// 	e.screen.WriteString("░")
-			// case world.TileTypeEmpty:
-			// 	e.screen.WriteString(" ")
-
-			// v3
-			// case world.TileTypeWall:
-			// 	e.screen.WriteString("■")
-			// case world.TileTypeFloor:
-			// 	e.screen.WriteString(".")
-			// case world.TileTypeEmpty:
-			// 	e.screen.WriteString(" ")
-
 			default:
 				panic(fmt.Sprintf("unknown tile type: %d", tile.Type))
 			}
