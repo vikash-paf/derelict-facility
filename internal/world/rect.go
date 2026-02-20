@@ -35,5 +35,15 @@ func (r Rect) Intersects(other Rect) bool {
 		A's top edge is above B's bottom edge.
 	*/
 
+	overlapX := r.X1 < other.X2 && r.X2 > other.X1
+	if overlapX {
+		return true
+	}
+
+	overlapY := r.Y1 < other.Y2 && r.Y2 > other.Y1
+	if overlapY {
+		return true
+	}
+
 	return false
 }
