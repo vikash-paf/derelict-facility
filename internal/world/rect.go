@@ -27,7 +27,6 @@ func (r Rect) Height() int {
 }
 
 func (r Rect) Intersects(other Rect) bool {
-	// todo: implement AABB algo https://stackoverflow.com/a/22512393
 	/*
 		A's left edge is to the left of B's right edge.
 		A's right edge is to the right of B's left edge.
