@@ -93,9 +93,9 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 	}
 }
 
-func (e *Engine) movePlayer(x, y int) {
-	newX := e.Player.X + x
-	newY := e.Player.Y + y
+func (e *Engine) movePlayer(dx, dy int) {
+	newX := e.Player.X + dx
+	newY := e.Player.Y + dy
 
 	// if outside the map, do nothing
 	if newX < 0 || newX >= e.Map.Width || newY < 0 || newY >= e.Map.Height {
