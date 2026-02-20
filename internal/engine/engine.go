@@ -21,17 +21,24 @@ type Engine struct {
 	Map      *world.Map
 	Player   *entity.Actor
 
+	Theme world.TileVariant
+
 	Running    bool
 	TickerRate time.Duration
 	screen     bytes.Buffer
 }
 
-func NewEngine(term *terminal.Terminal, width, height int) *Engine {
+func NewEngine(
+	term *terminal.Terminal,
+	width, height int,
+	startingTheme world.TileVariant,
+) *Engine {
 	e := &Engine{
 		Terminal:   term,
 		Map:        world.NewMap(width, height),
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
+		Theme:      startingTheme,
 	}
 
 	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
