@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	maxRooms    = 30
+	maxRooms    = 50
 	roomMinSize = 4
 	roomMaxSize = 10
 )
