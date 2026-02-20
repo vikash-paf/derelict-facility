@@ -15,15 +15,13 @@ const (
 )
 
 type Engine struct {
-	Terminal *terminal.Terminal
-	Map      *world.Map
-	Player   *world.Player
-
-	Theme world.TileVariant
-
-	Running    bool
-	TickerRate time.Duration
+	Terminal   *terminal.Terminal
+	Map        *world.Map
+	Player     *world.Player
+	Theme      world.TileVariant
 	screen     bytes.Buffer
+	TickerRate time.Duration
+	Running    bool
 }
 
 func NewEngine(
