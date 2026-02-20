@@ -32,6 +32,8 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		return nil, 0, 0
 	}
 
+	playerX, playerY := width/2, height/2
+
 	// 1. create the empty map, with walls (non walkable tiles)
 	m := NewMap(width, height)
 	for x := 0; x < width; x++ {
@@ -72,6 +74,11 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 					}
 				}
 				rooms = append(rooms, room)
+
+				// get player coordinates
+				if len(rooms) == 1 {
+					playerX, playerY = room.Center()
+				}
 			}
 		}
 		// If intersects throw it away
@@ -83,5 +90,5 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	// 2.1 carve the rooms
 	// 2.2 connect the rooms (l-corridors)
 	// 3. return the map and the player position (center of the first room)
-	return m, 0, 0
+	return m, playerX, playerY
 }
