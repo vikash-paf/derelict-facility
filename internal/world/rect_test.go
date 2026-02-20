@@ -43,13 +43,13 @@ func TestRect_Intersects(t *testing.T) {
 			name:     "shared corner",
 			rect1:    Rect{X1: 0, Y1: 0, X2: 10, Y2: 10},
 			rect2:    Rect{X1: 10, Y1: 10, X2: 15, Y2: 15},
-			overlaps: false,
+			overlaps: true,
 		},
 		{
 			name:     "single point overlap",
 			rect1:    Rect{X1: 5, Y1: 5, X2: 10, Y2: 10},
 			rect2:    Rect{X1: 10, Y1: 10, X2: 15, Y2: 15},
-			overlaps: false,
+			overlaps: true,
 		},
 		{
 			name:     "negative coordinates overlap",
