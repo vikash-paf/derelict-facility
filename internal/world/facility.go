@@ -22,6 +22,11 @@ type FacilityGenerator struct {
 	rng  *rand.Rand // random number generator
 }
 
+func (f FacilityGenerator) randomBetween(min, max int) int {
+	spread := max - min + 1
+	return f.rng.IntN(spread) + min
+}
+
 func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	if width < roomMinSize || height < roomMinSize {
 		return nil, 0, 0
@@ -33,6 +38,36 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		for y := 0; y < height; y++ {
 			m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
 		}
+	}
+
+	var rooms []Rect
+
+	for i := 0; i < maxRooms; i++ {
+		rWidth := f.randomBetween(roomMinSize, roomMaxSize)
+		rHeight := f.randomBetween(roomMinSize, roomMaxSize)
+
+		x := f.randomBetween(1, width-rWidth-1)
+		y := f.randomBetween(1, height-rHeight-1)
+
+		room := Rect{X1: x, Y1: y, X2: x + rWidth, Y2: y + rHeight}
+
+		// carve room into the map
+		for r := range rooms {
+			if room.Intersects(rooms[r]) {
+				continue
+			} else {
+				// carve room
+				for x := room.X1; x <= room.X2; x++ {
+					for y := room.Y1; y <= room.Y2; y++ {
+						m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
+					}
+				}
+				rooms = append(rooms, room)
+			}
+		}
+		// If intersects throw it away
+		// continue
+		// else carve it
 	}
 
 	// 2. run the generation algorithm (l-Corridors algorithm, aka Procedural Dungeon Generator)
