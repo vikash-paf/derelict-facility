@@ -114,12 +114,20 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 }
 
 func (f FacilityGenerator) createHorizontalCorridor(m *Map, x1, x2, y int) {
+	// Swap if drawing right-to-left
+	if x1 > x2 {
+		x1, x2 = x2, x1
+	}
 	for x := x1; x <= x2; x++ {
 		m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
 	}
 }
 
 func (f FacilityGenerator) createVerticalCorridor(m *Map, y1, y2, x int) {
+	// Swap if drawing bottom-to-top
+	if y1 > y2 {
+		y1, y2 = y2, y1
+	}
 	for y := y1; y <= y2; y++ {
 		m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
 	}
