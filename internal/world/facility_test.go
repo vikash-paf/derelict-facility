@@ -5,6 +5,27 @@ import (
 )
 
 func TestFacilityGenerator_Generate(t *testing.T) {
+	countTiles := func(m *Map) (walls, walkable int) {
+		for x := 0; x < m.Width; x++ {
+			for y := 0; y < m.Height; y++ {
+				tile := m.GetTile(x, y)
+				if tile.Type == TileTypeWall && !tile.Walkable {
+					walls++
+				} else if tile.Walkable {
+					walkable++
+				}
+			}
+		}
+		return
+	}
+
+	calculateExpectedWalls := func(width, height int, rooms []Rect) int {
+		walls := width * height
+		for _, room := range rooms {
+			walls -= room.Width() * room.Height()
+		}
+		return walls
+	}
 	tests := []struct {
 		name          string
 		width, height int
@@ -19,10 +40,31 @@ func TestFacilityGenerator_Generate(t *testing.T) {
 			expectNilMap:  true,
 		},
 		{
+			name:          "Minimal valid map",
+			width:         roomMinSize,
+			height:        roomMinSize,
+			expectedWalls: roomMinSize * roomMinSize,
+			expectNilMap:  false,
+		},
+		{
 			name:          "Small square map",
 			width:         4,
 			height:        4,
 			expectedWalls: 16,
+			expectNilMap:  false,
+		},
+		{
+			name:          "Wide map with minimal height",
+			width:         20,
+			height:        roomMinSize,
+			expectedWalls: 20 * roomMinSize,
+			expectNilMap:  false,
+		},
+		{
+			name:          "Tall map with minimal width",
+			width:         roomMinSize,
+			height:        30,
+			expectedWalls: roomMinSize * 30,
 			expectNilMap:  false,
 		},
 		{
@@ -33,10 +75,10 @@ func TestFacilityGenerator_Generate(t *testing.T) {
 			expectNilMap:  false,
 		},
 		{
-			name:          "Large square map",
-			width:         50,
-			height:        50,
-			expectedWalls: 2500,
+			name:          "Very large square map",
+			width:         500,
+			height:        500,
+			expectedWalls: 500 * 500,
 			expectNilMap:  false,
 		},
 	}
@@ -64,32 +106,21 @@ func TestFacilityGenerator_Generate(t *testing.T) {
 				t.Fatalf("Expected map dimensions to be (%d, %d), got (%d, %d)", tc.width, tc.height, m.Width, m.Height)
 			}
 
-			countWalls := 0
-			walkableTiles := 0
-			for x := 0; x < m.Width; x++ {
-				for y := 0; y < m.Height; y++ {
-					tile := m.GetTile(x, y)
-					if tile.Type == TileTypeWall && !tile.Walkable {
-						countWalls++
-					} else if tile.Walkable {
-						walkableTiles++
-					}
-				}
-			}
+			countWalls, walkableTiles := countTiles(m)
 			if walkableTiles != (m.Width*m.Height - countWalls) {
 				t.Fatalf("Walkable tile count (%d) does not match expected value (%d)", walkableTiles, m.Width*m.Height-countWalls)
 			}
 
-			expectedWalls := tc.width * tc.height
-			for _, room := range m.Rooms {
-				expectedWalls -= room.Width() * room.Height()
-			}
+			expectedWalls := calculateExpectedWalls(tc.width, tc.height, m.Rooms)
 			if countWalls != expectedWalls {
 				t.Fatalf("Expected %d wall tiles after room carving, but counted %d", expectedWalls, countWalls)
 			}
 
-			if px != 0 || py != 0 {
-				t.Fatalf("Expected player position to be (0, 0), got (%d, %d)", px, py)
+			if m.Rooms != nil && len(m.Rooms) > 0 {
+				centerX, centerY := m.Rooms[0].Center()
+				if px != centerX || py != centerY {
+					t.Fatalf("Expected player position to match the first room center (%d, %d), got (%d, %d)", centerX, centerY, px, py)
+				}
 			}
 		})
 	}
