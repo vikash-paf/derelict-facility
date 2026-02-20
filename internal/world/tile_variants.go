@@ -16,31 +16,31 @@ const (
 	Gray    = "\x1b[90m"
 )
 
-// SIMPLE VARIANTS (No Colors)
+type TileVariant [maxTileTypes]string
 
 // TileVariantClassic 1. Classic Rogue (The old-school standard)
-var TileVariantClassic = [maxTileTypes]string{
+var TileVariantClassic = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "#",
 	TileTypeFloor: ".",
 }
 
 // TileVariantSolid 2. Heavy Concrete (Thick, solid walls with tiny floor dots)
-var TileVariantSolid = [maxTileTypes]string{
+var TileVariantSolid = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "█",
 	TileTypeFloor: "·",
 }
 
 // TileVariantGritty 3. Rusty & Gritty (Textured blocks, perfect for a derelict vibe)
-var TileVariantGritty = [maxTileTypes]string{
+var TileVariantGritty = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "▓",
 	TileTypeFloor: "░",
 }
 
 // TileVariantBlueprint 4. Clean Blueprint (Thin, structural walls)
-var TileVariantBlueprint = [maxTileTypes]string{
+var TileVariantBlueprint = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "╬",
 	TileTypeFloor: "◦",
@@ -49,35 +49,35 @@ var TileVariantBlueprint = [maxTileTypes]string{
 // COLOR VARIANTS
 
 // TileVariantToxic 5. Toxic Sector (Dark gray walls, glowing green floors)
-var TileVariantToxic = [maxTileTypes]string{
+var TileVariantToxic = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  Gray + "█" + Reset,
 	TileTypeFloor: Green + "·" + Reset,
 }
 
 // TileVariantAlert 6. Red Alert (Harsh red walls, warning-yellow floors)
-var TileVariantAlert = [maxTileTypes]string{
+var TileVariantAlert = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  Red + "▓" + Reset,
 	TileTypeFloor: Yellow + "░" + Reset,
 }
 
 // TileVariantCold 7. Cold Storage (Deep blue walls, icy cyan floors)
-var TileVariantCold = [maxTileTypes]string{
+var TileVariantCold = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  Blue + "█" + Reset,
 	TileTypeFloor: Cyan + "." + Reset,
 }
 
 // TileVariantHive 8. Alien Hive (Purple textured walls, green slime floors)
-var TileVariantHive = [maxTileTypes]string{
+var TileVariantHive = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  Magenta + "▓" + Reset,
 	TileTypeFloor: Green + "~" + Reset,
 }
 
 // TileVariantDark 9. Power Outage (Barely visible dark gray walls, faint white floors)
-var TileVariantDark = [maxTileTypes]string{
+var TileVariantDark = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  Gray + "#" + Reset,
 	TileTypeFloor: White + "." + Reset,
