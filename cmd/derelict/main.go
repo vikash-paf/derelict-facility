@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	width, height := 80, 25
+	width, height := 120, 30
 
 	term := terminal.NewTerminal()
 	err := term.EnableRawMode()
@@ -19,21 +19,22 @@ func main() {
 	}
 	defer term.Restore()
 
-	// get the terminal size and use that for the map
-	width, height, err = term.GetSize()
+	// 1. Get the terminal size
+	// todo: (there is a sizing issue with my terminal emulator, so use the 120x30)
+	_, _, err = term.GetSize()
 	if err != nil {
 		panic(err)
 	}
 
-	gameEngine := engine.NewEngine(term, width, height, world.TileVariantSolid)
-
+	// 2. Build the world and player FIRST
 	seed := time.Now().UnixNano()
 	generator := world.NewFacilityGenerator(uint64(seed))
-
 	generatedMap, playerX, playerY := generator.Generate(width, height)
-	gameEngine.Map = generatedMap
-	gameEngine.Player.X = playerX
-	gameEngine.Player.Y = playerY
+
+	player := world.NewPlayer(playerX, playerY, world.PlayerStatusHealthy)
+
+	// 3. Hand them to the Engine
+	gameEngine := engine.NewEngine(term, generatedMap, player, world.TileVariantSolid)
 
 	err = gameEngine.Run()
 	if err != nil {
