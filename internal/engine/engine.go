@@ -2,11 +2,9 @@ package engine
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"time"
 
-	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -17,27 +15,32 @@ const (
 )
 
 type Engine struct {
-	Terminal *terminal.Terminal
-	Map      *world.Map
-	Player   *entity.Actor
-
-	Running    bool
-	TickerRate time.Duration
+	Terminal   *terminal.Terminal
+	Map        *world.Map
+	Player     *world.Player
+	Theme      world.TileVariant
 	screen     bytes.Buffer
+	TickerRate time.Duration
+	Running    bool
 }
 
-func NewEngine(term *terminal.Terminal, width, height int) *Engine {
+func NewEngine(
+	term *terminal.Terminal,
+	width, height int,
+	startingTheme world.TileVariant,
+) *Engine {
 	e := &Engine{
 		Terminal:   term,
 		Map:        world.NewMap(width, height),
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
+		Theme:      startingTheme,
 	}
 
 	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
 	e.screen.Grow(memorySize)
 
-	e.Player = entity.NewActor(width/2, height/2, '@')
+	e.Player = world.NewPlayer(width/2, height/2, world.PlayerStatusHealthy)
 
 	return e
 }
@@ -108,7 +111,7 @@ func (e *Engine) render() {
 		for x := 0; x < e.Map.Width; x++ {
 			// 1. Render the player
 			if e.Player.X == x && e.Player.Y == y {
-				e.screen.WriteRune(e.Player.Char)
+				e.screen.WriteString(e.Player.Render())
 				continue
 			}
 
@@ -118,43 +121,7 @@ func (e *Engine) render() {
 				continue
 			}
 
-			switch tile.Type {
-
-			// v0
-			// case world.TileTypeWall:
-			// 	e.screen.WriteString("#")
-			// case world.TileTypeFloor:
-			// 	e.screen.WriteString("·")
-			// case world.TileTypeEmpty:
-			// 	e.screen.WriteString(" ")
-
-			// v1
-			case world.TileTypeWall:
-				e.screen.WriteString("█")
-			case world.TileTypeFloor:
-				e.screen.WriteString("·")
-			case world.TileTypeEmpty:
-				e.screen.WriteString(" ")
-
-			// v2
-			// case world.TileTypeWall:
-			// 	e.screen.WriteString("▓")
-			// case world.TileTypeFloor:
-			// 	e.screen.WriteString("░")
-			// case world.TileTypeEmpty:
-			// 	e.screen.WriteString(" ")
-
-			// v3
-			// case world.TileTypeWall:
-			// 	e.screen.WriteString("■")
-			// case world.TileTypeFloor:
-			// 	e.screen.WriteString(".")
-			// case world.TileTypeEmpty:
-			// 	e.screen.WriteString(" ")
-
-			default:
-				panic(fmt.Sprintf("unknown tile type: %d", tile.Type))
-			}
+			e.screen.WriteString(e.Theme[tile.Type])
 		}
 
 		e.screen.WriteString(lineBreak)

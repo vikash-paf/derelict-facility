@@ -2,10 +2,10 @@ package entity
 
 // Entity represents an actor in the game, such as the player or drones
 type Entity struct {
-	ID   int
 	Name string
-	// X, Y coordinates
-	X, Y int
+	ID   int
+	X    int
+	Y    int
 }
 
 // New creates a new entity

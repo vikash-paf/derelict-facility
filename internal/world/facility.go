@@ -18,8 +18,8 @@ func NewFacilityGenerator(seed uint64) *FacilityGenerator {
 }
 
 type FacilityGenerator struct {
+	rng  *rand.Rand
 	seed uint64
-	rng  *rand.Rand // random number generator
 }
 
 func (f *FacilityGenerator) randomBetween(min, max int) int {
