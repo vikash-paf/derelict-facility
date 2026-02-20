@@ -1,12 +1,14 @@
 package world
 
 import (
-	"math/rand/v2"
+	"math/rand"
 )
 
 func NewFacilityGenerator(seed int64) *FacilityGenerator {
-	// initialize the local rng
-	return nil
+	return &FacilityGenerator{
+		seed: seed,
+		rng:  rand.New(rand.NewSource(seed)),
+	}
 }
 
 type FacilityGenerator struct {
