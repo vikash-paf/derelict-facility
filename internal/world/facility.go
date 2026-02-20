@@ -36,5 +36,5 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	// 2.1 carve the rooms
 	// 2.2 connect the rooms (l-corridors)
 	// 3. return the map and the player position (center of the first room)
-	return nil, 0, 0
+	return m, 0, 0
 }
