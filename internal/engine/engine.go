@@ -26,21 +26,22 @@ type Engine struct {
 
 func NewEngine(
 	term *terminal.Terminal,
-	width, height int,
+	gameMap *world.Map,
+	player *world.Player,
 	startingTheme world.TileVariant,
 ) *Engine {
 	e := &Engine{
 		Terminal:   term,
-		Map:        world.NewMap(width, height),
+		Map:        gameMap,
+		Player:     player,
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
 	}
 
-	memorySize := (width * height) + (height * 2) + 50 // bytes, a little bit extra memory
+	// Calculate memory based on the map handed to us
+	memorySize := (gameMap.Width * gameMap.Height) + (gameMap.Height * 2) + 50
 	e.screen.Grow(memorySize)
-
-	e.Player = world.NewPlayer(width/2, height/2, world.PlayerStatusHealthy)
 
 	return e
 }
@@ -57,8 +58,8 @@ func (e *Engine) Run() error {
 		case event := <-inputChan:
 			e.handleInput(event)
 		case <-ticker.C:
-			// todo: other logic here, like other characters moving around
-			e.render()
+			e.Update() // Calculate all game rules!
+			e.render() // Paint the results!
 		}
 	}
 
@@ -92,9 +93,9 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 	}
 }
 
-func (e *Engine) movePlayer(x, y int) {
-	newX := e.Player.X + x
-	newY := e.Player.Y + y
+func (e *Engine) movePlayer(dx, dy int) {
+	newX := e.Player.X + dx
+	newY := e.Player.Y + dy
 
 	// if outside the map, do nothing
 	if newX < 0 || newX >= e.Map.Width || newY < 0 || newY >= e.Map.Height {
@@ -135,4 +136,13 @@ func (e *Engine) render() {
 
 	// Render the screen
 	os.Stdout.Write(e.screen.Bytes())
+}
+
+func (e *Engine) Update() {
+	// Right now, this is empty!
+	// But tomorrow, this is where I will add:
+	// - Check if the player stepped on a checkpoint
+	// - Move enemies
+	// - Trigger story events
+	// - Update flashing light animations
 }
