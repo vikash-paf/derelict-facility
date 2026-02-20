@@ -1,8 +1,15 @@
 package world
 
 type Rect struct {
-	X1, Y1 int // top left corner
-	X2, Y2 int // bottom right corner
+	X1, Y1 int // left-top corner
+	X2, Y2 int // right-bottom corner
+
+	/*
+		Left Edge: X1 (The smallest X value)
+		Right Edge: X2 (The biggest X value)
+		Top Edge: Y1 (The smallest Y value)
+		Bottom Edge: Y2 (The biggest Y value)
+	*/
 }
 
 func (r Rect) Center() (x, y int) {
