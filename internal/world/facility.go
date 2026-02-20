@@ -51,8 +51,8 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		maxX := width - rWidth - 1
 		maxY := height - rHeight - 1
 
-		// If the max is less than 0, the room is too big to fit.
-		// Skip this attempt and try rolling a new room!
+		// If the max is less than 0, the newRoom is too big to fit.
+		// Skip this attempt and try rolling a new newRoom!
 		if maxX < 0 || maxY < 0 {
 			continue
 		}
@@ -60,30 +60,47 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		x := f.randomBetween(0, maxX)
 		y := f.randomBetween(0, maxY)
 
-		room := Rect{X1: x, Y1: y, X2: x + rWidth, Y2: y + rHeight}
+		newRoom := Rect{X1: x, Y1: y, X2: x + rWidth, Y2: y + rHeight}
 
-		// carve room into the map
-		for r := range rooms {
-			if room.Intersects(rooms[r]) {
-				continue
-			} else {
-				// carve room
-				for x := room.X1; x <= room.X2; x++ {
-					for y := room.Y1; y <= room.Y2; y++ {
-						m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
-					}
-				}
-				rooms = append(rooms, room)
-
-				// get player coordinates
-				if len(rooms) == 1 {
-					playerX, playerY = room.Center()
-				}
+		// carve newRoom into the map
+		overlaps := false
+		for _, otherRoom := range rooms {
+			if newRoom.Intersects(otherRoom) {
+				overlaps = true
+				break
 			}
 		}
-		// If intersects throw it away
-		// continue
-		// else carve it
+
+		if overlaps {
+			continue
+		}
+		// carve newRoom
+		for rx := newRoom.X1; rx <= newRoom.X2; rx++ {
+			for ry := newRoom.Y1; ry <= newRoom.Y2; ry++ {
+				m.SetTile(rx, ry, Tile{Type: TileTypeFloor, Walkable: true})
+			}
+		}
+
+		// get player coordinates
+		if len(rooms) == 0 {
+			playerX, playerY = newRoom.Center()
+		} else {
+			prevRoom := rooms[len(rooms)-1]
+			prevX, prevY := prevRoom.Center()
+			newX, newY := newRoom.Center()
+
+			if f.rng.IntN(2) == 1 {
+				// Horizontal then Vertical
+				f.createHorizontalCorridor(m, prevX, newX, prevY)
+				f.createVerticalCorridor(m, prevY, newY, newX)
+			} else {
+				// Vertical then Horizontal
+				f.createVerticalCorridor(m, prevY, newY, prevX)
+				f.createHorizontalCorridor(m, prevX, newX, newY)
+			}
+		}
+
+		rooms = append(rooms, newRoom)
 	}
 
 	// 2. run the generation algorithm (l-Corridors algorithm, aka Procedural Dungeon Generator)
