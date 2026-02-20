@@ -23,7 +23,10 @@ type FacilityGenerator struct {
 }
 
 func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
-	// todo:
+	if width < roomMinSize || height < roomMinSize {
+		return nil, 0, 0
+	}
+
 	// 1. create the empty map, with walls (non walkable tiles)
 	m := NewMap(width, height)
 	for x := 0; x < width; x++ {
