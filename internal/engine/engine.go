@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"time"
 
@@ -125,16 +124,7 @@ func (e *Engine) render() {
 				continue
 			}
 
-			switch tile.Type {
-			case world.TileTypeWall:
-				e.screen.WriteString("█")
-			case world.TileTypeFloor:
-				e.screen.WriteString("·")
-			case world.TileTypeEmpty:
-				e.screen.WriteString(" ")
-			default:
-				panic(fmt.Sprintf("unknown tile type: %d", tile.Type))
-			}
+			e.screen.WriteString(e.Theme[tile.Type])
 		}
 
 		e.screen.WriteString(lineBreak)

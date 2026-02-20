@@ -85,19 +85,19 @@ var TileVariantDark = TileVariant{
 
 // todo: with a tile variants (theming) system implemented, now I can simulate weather, lightning, fire, etc.
 
-var ThemeLightning = TileVariant{
+var TileVariantLightning = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "\x1b[97m█\x1b[0m", // Bright white walls
 	TileTypeFloor: "\x1b[97m.\x1b[0m", // Bright white floors
 }
 
-var ThemeFlooded = TileVariant{
+var TileVariantFlooded = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "\x1b[34m█\x1b[0m", // Wet, dark blue walls
 	TileTypeFloor: "\x1b[36m~\x1b[0m", // Cyan ripples on the floor
 }
 
-var ThemeAsh = TileVariant{
+var TileVariantAsh = TileVariant{
 	TileTypeEmpty: " ",
 	TileTypeWall:  "\x1b[37m▓\x1b[0m", // White frosted walls
 	TileTypeFloor: "\x1b[90m*\x1b[0m", // Grey asterisks for ash/snow
