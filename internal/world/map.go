@@ -42,21 +42,25 @@ func (m *Map) ComputeFOV(playerX, playerY int, radius int) {
 	// 1.2 cast rays to the points in the bounding box (TOP and BOTTOM edges of the box)
 	for x := minX; x <= maxX; x++ {
 		// cast ray to top edge
+		m.castRay(playerX, playerY, x, minY)
 		// cast ray to bottom edge
+		m.castRay(playerX, playerY, x, maxY)
 
 	}
 
 	// 1.2 cast rays to the points in the bounding box (TOP and BOTTOM edges of the box)
 	for y := minY; y <= maxY; y++ {
 		// cast ray to top edge
+		m.castRay(playerX, playerY, minX, y)
 		// cast ray to bottom edge
+		m.castRay(playerX, playerY, maxX, y)
 	}
-
-	// 2. compute the visible tiles
-	// 3. mark all tiles in the radius as visible
-	// uses Bresenham's line algorithm
 }
 
 func (m *Map) castRay(x1, y1, x2, y2 int) {
 	// implement cast the "ray" using Bresenham's line algorithm'
+
+	// 2. compute the visible tiles
+	// 3. mark all tiles in the radius as visible
+	// uses Bresenham's line algorithm
 }
