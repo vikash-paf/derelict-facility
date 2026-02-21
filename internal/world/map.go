@@ -79,11 +79,3 @@ func (m *Map) castRay(x1, y1, x2, y2 int) {
 		}
 	}
 }
-
-func getLine(x1, y1, x2, y2 int) []Point {
-	points := make([]Point, 0)
-
-	// get all the coordinates of the "cells" in the line
-
-	return points
-}
