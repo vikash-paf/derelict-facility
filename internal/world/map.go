@@ -15,6 +15,14 @@ func NewMap(width, height int) *Map {
 	}
 }
 
+func (m *Map) IsWalkable(x, y int) bool {
+	tile := m.GetTile(x, y)
+	if tile == nil {
+		return false
+	}
+	return tile.Walkable
+}
+
 func (m *Map) SetTile(x, y int, tile Tile) {
 	m.Tiles[x+y*m.Width] = tile
 }
