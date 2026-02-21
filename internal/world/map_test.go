@@ -101,7 +101,7 @@ func TestCastRay(t *testing.T) {
 
 			// Log the visual state for inspection on failure or -v
 			t.Logf("\nTest: %s (Map: %s)\nRay: (%d,%d) -> (%d,%d)\n%s",
-				tt.name, tt.layoutName, tt.x0, tt.y0, tt.x1, tt.y1, InspectVisibility(m))
+				tt.name, tt.layoutName, tt.x0, tt.y0, tt.x1, tt.y1, InspectVisibility(m, 0, 0))
 
 			// Check expected visible points
 			for _, p := range tt.wantVis {
@@ -116,6 +116,83 @@ func TestCastRay(t *testing.T) {
 				idx := p.X + p.Y*m.Width
 				if m.Tiles[idx].Visible {
 					t.Errorf("Expected point {%d, %d} to be hidden, but it was visible", p.X, p.Y)
+				}
+			}
+		})
+	}
+}
+
+func TestComputeFOV(t *testing.T) {
+	layouts := map[string]string{
+		"pillar_room": `
+...........
+...........
+.....#.....
+...........
+...........`,
+		"closed_corridor": `
+###########
+#.........#
+#....#....#
+#.........#
+###########`,
+	}
+
+	tests := []struct {
+		name       string
+		layoutName string
+		playerX    int
+		playerY    int
+		radius     int
+		// Points we want to verify
+		mustSee    []Point
+		mustNotSee []Point
+	}{
+		{
+			name:       "short-range-no-obstruction",
+			layoutName: "pillar_room",
+			playerX:    5, playerY: 0,
+			radius:     2,
+			mustSee:    []Point{{5, 0}, {5, 2}}, // Directly below
+			mustNotSee: []Point{{5, 4}},         // Too far for radius 2
+		},
+		{
+			name:       "shadow-behind-pillar",
+			layoutName: "pillar_room",
+			playerX:    5, playerY: 1,
+			radius:     4,
+			mustSee:    []Point{{5, 2}}, // The wall itself
+			mustNotSee: []Point{{5, 3}}, // Shadow cast by wall at (5,2)
+		},
+		{
+			name:       "trapped-in-box",
+			layoutName: "closed_corridor",
+			playerX:    5, playerY: 2,
+			radius:     10,
+			mustSee:    []Point{{1, 2}, {9, 2}},  // Internal walls
+			mustNotSee: []Point{{0, 2}, {10, 2}}, // Outside the map boundary walls
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestMap(layouts[tt.layoutName])
+
+			m.ComputeFOV(tt.playerX, tt.playerY, tt.radius)
+
+			// Visual Debug Output
+			t.Logf("\nTest: %s\nPlayer at (%d,%d), Radius: %d\n%s",
+				tt.name, tt.playerX, tt.playerY, tt.radius, InspectVisibility(m, tt.playerX, tt.playerY))
+
+			// Assertions
+			for _, p := range tt.mustSee {
+				if !m.Tiles[p.X+p.Y*m.Width].Visible {
+					t.Errorf("Expected point {%d, %d} to be visible", p.X, p.Y)
+				}
+			}
+			for _, p := range tt.mustNotSee {
+				if m.Tiles[p.X+p.Y*m.Width].Visible {
+					t.Errorf("Expected point {%d, %d} to be hidden", p.X, p.Y)
 				}
 			}
 		})
