@@ -17,3 +17,7 @@ func New(id int, name string, x, y int) *Entity {
 		Y:    y,
 	}
 }
+
+type Point struct {
+	X, Y int // the coordinates on the map
+}

@@ -3,6 +3,8 @@ package world
 import (
 	"strings"
 	"testing"
+
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
 // Helper to create a map from a string for easy testing
@@ -61,29 +63,29 @@ func TestCastRay(t *testing.T) {
 		layoutName string
 		x0, y0     int
 		x1, y1     int
-		wantVis    []Point // Tiles that MUST be visible
-		wantHidden []Point // Tiles that MUST NOT be visible (behind walls)
+		wantVis    []entity.Point // Tiles that MUST be visible
+		wantHidden []entity.Point // Tiles that MUST NOT be visible (behind walls)
 	}{
 		{
 			name:       "blocked-horizontal",
 			layoutName: "small_room",
 			x0:         0, y0: 2, x1: 6, y1: 2,
-			wantVis:    []Point{{0, 2}, {3, 2}}, // Start and the Wall itself
-			wantHidden: []Point{{4, 2}, {5, 2}}, // Points behind the wall
+			wantVis:    []entity.Point{{0, 2}, {3, 2}}, // Start and the Wall itself
+			wantHidden: []entity.Point{{4, 2}, {5, 2}}, // Points behind the wall
 		},
 		{
 			name:       "clear-path-vertical",
 			layoutName: "small_room",
 			x0:         1, y0: 0, x1: 1, y1: 4,
-			wantVis:    []Point{{1, 0}, {1, 2}, {1, 4}},
-			wantHidden: []Point{},
+			wantVis:    []entity.Point{{1, 0}, {1, 2}, {1, 4}},
+			wantHidden: []entity.Point{},
 		},
 		{
 			name:       "long-range-obscured",
 			layoutName: "large_corridor",
 			x0:         2, y0: 2, x1: 20, y1: 2,
-			wantVis:    []Point{{2, 2}, {9, 2}},
-			wantHidden: []Point{{10, 2}, {15, 2}, {20, 2}},
+			wantVis:    []entity.Point{{2, 2}, {9, 2}},
+			wantHidden: []entity.Point{{10, 2}, {15, 2}, {20, 2}},
 		},
 	}
 
@@ -145,32 +147,32 @@ func TestComputeFOV(t *testing.T) {
 		playerY    int
 		radius     int
 		// Points we want to verify
-		mustSee    []Point
-		mustNotSee []Point
+		mustSee    []entity.Point
+		mustNotSee []entity.Point
 	}{
 		{
 			name:       "short-range-no-obstruction",
 			layoutName: "pillar_room",
 			playerX:    5, playerY: 0,
 			radius:     2,
-			mustSee:    []Point{{5, 0}, {5, 2}}, // Directly below
-			mustNotSee: []Point{{5, 4}},         // Too far for radius 2
+			mustSee:    []entity.Point{{5, 0}, {5, 2}}, // Directly below
+			mustNotSee: []entity.Point{{5, 4}},         // Too far for radius 2
 		},
 		{
 			name:       "shadow-behind-pillar",
 			layoutName: "pillar_room",
 			playerX:    5, playerY: 1,
 			radius:     4,
-			mustSee:    []Point{{5, 2}}, // The wall itself
-			mustNotSee: []Point{{5, 3}}, // Shadow cast by wall at (5,2)
+			mustSee:    []entity.Point{{5, 2}}, // The wall itself
+			mustNotSee: []entity.Point{{5, 3}}, // Shadow cast by wall at (5,2)
 		},
 		{
 			name:       "trapped-in-box",
 			layoutName: "closed_corridor",
 			playerX:    5, playerY: 2,
 			radius:     10,
-			mustSee:    []Point{{1, 2}, {9, 2}},  // Internal walls
-			mustNotSee: []Point{{0, 2}, {10, 2}}, // Outside the map boundary walls
+			mustSee:    []entity.Point{{1, 2}, {9, 2}},  // Internal walls
+			mustNotSee: []entity.Point{{0, 2}, {10, 2}}, // Outside the map boundary walls
 		},
 	}
 

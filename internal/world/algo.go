@@ -1,14 +1,15 @@
 package world
 
 import (
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/math"
 )
 
 // getLine uses Bresenham's Line Algorithm to return all points between A and B.
 // Think of this as charting a laser beam or line-of-sight across your facility's floor grid.
 // Read more: https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-func getLine(x0, y0, x1, y1 int) []Point {
-	var points []Point
+func getLine(x0, y0, x1, y1 int) []entity.Point {
+	var points []entity.Point
 
 	// Calculate the absolute distances between the start and end points.
 	// dx is the total horizontal distance.
@@ -39,7 +40,7 @@ func getLine(x0, y0, x1, y1 int) []Point {
 	// Enter the infinite loop to walk the grid, tile by tile.
 	for {
 		// Log the current coordinate. The terminal needs to know every single tile to light up.
-		points = append(points, Point{X: x0, Y: y0})
+		points = append(points, entity.Point{X: x0, Y: y0})
 
 		// Check if we have reached the destination coordinates. If yes, terminate the loop.
 		if x0 == x1 && y0 == y1 {

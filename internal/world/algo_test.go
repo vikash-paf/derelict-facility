@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
 func TestGetLine(t *testing.T) {
@@ -11,7 +13,7 @@ func TestGetLine(t *testing.T) {
 		name     string
 		x0, y0   int
 		x1, y1   int
-		expected []Point
+		expected []entity.Point
 	}{
 		{
 			name:     "horizontal-right",
@@ -19,7 +21,7 @@ func TestGetLine(t *testing.T) {
 			y0:       0,
 			x1:       5,
 			y1:       0,
-			expected: []Point{{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}},
+			expected: []entity.Point{{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}},
 		},
 		{
 			name:     "horizontal-left",
@@ -27,7 +29,7 @@ func TestGetLine(t *testing.T) {
 			y0:       0,
 			x1:       0,
 			y1:       0,
-			expected: []Point{{5, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0}, {0, 0}},
+			expected: []entity.Point{{5, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0}, {0, 0}},
 		},
 		{
 			name:     "vertical-up",
@@ -35,7 +37,7 @@ func TestGetLine(t *testing.T) {
 			y0:       0,
 			x1:       0,
 			y1:       5,
-			expected: []Point{{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}},
+			expected: []entity.Point{{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}},
 		},
 		{
 			name:     "vertical-down",
@@ -43,7 +45,7 @@ func TestGetLine(t *testing.T) {
 			y0:       5,
 			x1:       0,
 			y1:       0,
-			expected: []Point{{0, 5}, {0, 4}, {0, 3}, {0, 2}, {0, 1}, {0, 0}},
+			expected: []entity.Point{{0, 5}, {0, 4}, {0, 3}, {0, 2}, {0, 1}, {0, 0}},
 		},
 		{
 			name:     "diagonal-right-up",
@@ -51,7 +53,7 @@ func TestGetLine(t *testing.T) {
 			y0:       0,
 			x1:       5,
 			y1:       5,
-			expected: []Point{{0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}},
+			expected: []entity.Point{{0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}},
 		},
 		{
 			name:     "diagonal-left-down",
@@ -59,7 +61,7 @@ func TestGetLine(t *testing.T) {
 			y0:       5,
 			x1:       0,
 			y1:       0,
-			expected: []Point{{5, 5}, {4, 4}, {3, 3}, {2, 2}, {1, 1}, {0, 0}},
+			expected: []entity.Point{{5, 5}, {4, 4}, {3, 3}, {2, 2}, {1, 1}, {0, 0}},
 		},
 		{
 			name:     "diagonal-right-down",
@@ -67,7 +69,7 @@ func TestGetLine(t *testing.T) {
 			y0:       5,
 			x1:       5,
 			y1:       0,
-			expected: []Point{{0, 5}, {1, 4}, {2, 3}, {3, 2}, {4, 1}, {5, 0}},
+			expected: []entity.Point{{0, 5}, {1, 4}, {2, 3}, {3, 2}, {4, 1}, {5, 0}},
 		},
 		{
 			name:     "diagonal-left-up",
@@ -75,7 +77,7 @@ func TestGetLine(t *testing.T) {
 			y0:       0,
 			x1:       0,
 			y1:       5,
-			expected: []Point{{5, 0}, {4, 1}, {3, 2}, {2, 3}, {1, 4}, {0, 5}},
+			expected: []entity.Point{{5, 0}, {4, 1}, {3, 2}, {2, 3}, {1, 4}, {0, 5}},
 		},
 		{
 			name:     "single-point",
@@ -83,7 +85,7 @@ func TestGetLine(t *testing.T) {
 			y0:       3,
 			x1:       3,
 			y1:       3,
-			expected: []Point{{3, 3}},
+			expected: []entity.Point{{3, 3}},
 		},
 		{
 			name:     "steep-slope",
@@ -91,7 +93,7 @@ func TestGetLine(t *testing.T) {
 			y0:       3,
 			x1:       4,
 			y1:       8,
-			expected: []Point{{2, 3}, {2, 4}, {3, 5}, {3, 6}, {4, 7}, {4, 8}},
+			expected: []entity.Point{{2, 3}, {2, 4}, {3, 5}, {3, 6}, {4, 7}, {4, 8}},
 		},
 		{
 			name:     "shallow-slope",
@@ -99,7 +101,7 @@ func TestGetLine(t *testing.T) {
 			y0:       2,
 			x1:       8,
 			y1:       4,
-			expected: []Point{{3, 2}, {4, 2}, {5, 3}, {6, 3}, {7, 4}, {8, 4}},
+			expected: []entity.Point{{3, 2}, {4, 2}, {5, 3}, {6, 3}, {7, 4}, {8, 4}},
 		},
 	}
 
@@ -116,7 +118,7 @@ func TestGetLine(t *testing.T) {
 	}
 }
 
-func renderDebug(points []Point, w, h int) string {
+func renderDebug(points []entity.Point, w, h int) string {
 	// Create a 2D grid of dots
 	grid := make([][]string, h+1)
 	for i := range grid {
