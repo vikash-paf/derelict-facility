@@ -129,7 +129,20 @@ func (e *Engine) render() {
 				continue
 			}
 
-			e.screen.WriteString(e.Theme[tile.Type])
+			if tile.Visible {
+				e.screen.WriteString(e.Theme[tile.Type])
+				continue
+			}
+
+			if tile.Explored {
+				// We wrap the character in Gray and Reset to "dim" the lights
+				// Note: We use the character from Classic to keep the 'memory' simple
+				char := e.Theme[tile.Type]
+				e.screen.WriteString(world.Gray + char + world.Reset)
+				continue
+			}
+
+			e.screen.WriteString(e.Theme[world.TileTypeEmpty])
 		}
 
 		e.screen.WriteString(lineBreak)
