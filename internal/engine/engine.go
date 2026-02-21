@@ -12,6 +12,7 @@ import (
 const (
 	cursorHome = "\033[H"
 	lineBreak  = "\r\n"
+	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
 )
 
 type Engine struct {
@@ -128,7 +129,20 @@ func (e *Engine) render() {
 				continue
 			}
 
-			e.screen.WriteString(e.Theme[tile.Type])
+			if tile.Visible {
+				e.screen.WriteString(e.Theme[tile.Type])
+				continue
+			}
+
+			if tile.Explored {
+				// We wrap the character in Gray and Reset to "dim" the lights
+				// Note: We use the character from Classic to keep the 'memory' simple
+				char := e.Theme[tile.Type]
+				e.screen.WriteString(world.Gray + char + world.Reset)
+				continue
+			}
+
+			e.screen.WriteString(e.Theme[world.TileTypeEmpty])
 		}
 
 		e.screen.WriteString(lineBreak)
@@ -139,8 +153,9 @@ func (e *Engine) render() {
 }
 
 func (e *Engine) Update() {
-	// Right now, this is empty!
-	// But tomorrow, this is where I will add:
+	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
+
+	// this is where I will add:
 	// - Check if the player stepped on a checkpoint
 	// - Move enemies
 	// - Trigger story events
