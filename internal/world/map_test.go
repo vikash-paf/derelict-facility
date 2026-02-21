@@ -40,7 +40,6 @@ func newTestMap(layout string) *Map {
 }
 
 func TestCastRay(t *testing.T) {
-	// 1. Define our facility layouts
 	layouts := map[string]string{
 		"small_room": `
 .......
@@ -57,7 +56,6 @@ func TestCastRay(t *testing.T) {
 ......................`,
 	}
 
-	// 2. Define the test cases
 	tests := []struct {
 		name       string
 		layoutName string
