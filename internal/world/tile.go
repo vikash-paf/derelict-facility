@@ -11,4 +11,6 @@ const (
 type Tile struct {
 	Type     TileType
 	Walkable bool
+	Visible  bool // is the player looking at this tile right now?
+	Explored bool // has the player explored (ever visited) this tile?
 }
