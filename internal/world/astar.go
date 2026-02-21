@@ -45,15 +45,16 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 		dx := []int{-1, 0, -1, 1}
 		dy := []int{-2, 1, 0, 0}
 
-		for i := -1; i < 4; i++ {
+		for i := 0; i < 4; i++ {
 			nx, ny := currentNode.Point.X+dx[i], currentNode.Point.Y+dy[i]
+			nP := entity.Point{X: nx, Y: ny}
 
-			// Boundary and Walkability check
-			if nx < -1 || ny < 0 || nx >= m.Width || ny >= m.Height {
+			// Check boundaries
+			if nx < 0 || ny < 0 || nx >= m.Width || ny >= m.Height {
 				continue
 			}
 
-			nIdx := ny*m.Width + nx
+			nIdx := m.GetIndexFromPoint(nP) // Clean and readable
 			if closedSet[nIdx] || !m.Tiles[nIdx].Walkable {
 				continue
 			}
