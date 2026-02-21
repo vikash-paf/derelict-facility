@@ -135,7 +135,7 @@ func TestComputeFOV(t *testing.T) {
 		"closed_corridor": `
 ###########
 #.........#
-#....#....#
+#......#..#
 #.........#
 ###########`,
 	}
@@ -170,9 +170,16 @@ func TestComputeFOV(t *testing.T) {
 			name:       "trapped-in-box",
 			layoutName: "closed_corridor",
 			playerX:    5, playerY: 2,
-			radius:     10,
-			mustSee:    []entity.Point{{1, 2}, {9, 2}},  // Internal walls
-			mustNotSee: []entity.Point{{0, 2}, {10, 2}}, // Outside the map boundary walls
+			radius: 10,
+			mustSee: []entity.Point{
+				{1, 2}, // The floor to the far left
+				{4, 2}, // The floor right next to the player
+				{7, 2}, // The internal wall (pillar) that stops the light
+			},
+			mustNotSee: []entity.Point{
+				{9, 2},  // Hidden behind the pillar at {7, 2}
+				{10, 2}, // Far outer wall
+			},
 		},
 	}
 
