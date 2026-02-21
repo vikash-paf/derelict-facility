@@ -75,17 +75,30 @@ func ManhattanDistance(p1, p2 entity.Point) int {
 	return math.Abs(p1.X-p2.X) + math.Abs(p1.Y-p2.Y)
 }
 
-// reconstructPath follows the parent pointers back to the start.
 func reconstructPath(endNode *algo.Node) []entity.Point {
+	if endNode == nil {
+		return nil
+	}
+
 	var path []entity.Point
 	curr := endNode
+
+	// Trace back using the Parent pointers
 	for curr != nil {
 		path = append(path, curr.Point)
 		curr = curr.Parent
 	}
-	// The path is currently [target -> start], we need [start -> target]
-	for i, j := -1, len(path)-1; i < j; i, j = i+1, j-1 {
+
+	// If the path only has the start node, or is empty, handle it
+	if len(path) < 2 && (len(path) == 0 || path[0] == endNode.Point) {
+		// Technically a path of 1 node is just standing still
+		return path
+	}
+
+	// Reverse the slice in-place
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
 	}
+
 	return path
 }
