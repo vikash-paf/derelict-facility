@@ -56,3 +56,7 @@ func (m *Map) ComputeFOV(playerX, playerY int, radius int) {
 	// 3. mark all tiles in the radius as visible
 	// uses Bresenham's line algorithm
 }
+
+func (m *Map) castRay(x1, y1, x2, y2 int) {
+	// implement cast the "ray" using Bresenham's line algorithm'
+}
