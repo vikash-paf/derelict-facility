@@ -1,7 +1,6 @@
 package world
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -10,9 +9,13 @@ import (
 // # = Wall (Not Walkable)
 // . = Floor (Walkable)
 func newTestMap(layout string) *Map {
-	lines := strings.Split(strings.TrimSpace(layout), "\n")
+	// Trim only the leading/trailing newlines of the whole block
+	layout = strings.Trim(layout, "\n")
+	lines := strings.Split(layout, "\n")
+
 	height := len(lines)
-	width := len(strings.TrimSpace(lines[0]))
+	width := len(lines[0]) // Assume all lines are the same length
+
 	m := &Map{
 		Width:  width,
 		Height: height,
@@ -20,7 +23,11 @@ func newTestMap(layout string) *Map {
 	}
 
 	for y, line := range lines {
-		for x, char := range strings.TrimSpace(line) {
+		for x, char := range line {
+			if x >= width {
+				break
+			} // Safety check for uneven strings
+
 			idx := x + y*width
 			if char == '#' {
 				m.Tiles[idx] = Tile{Type: TileTypeWall, Walkable: false}
@@ -32,39 +39,87 @@ func newTestMap(layout string) *Map {
 	return m
 }
 
-func TestCastRay_WallStopping(t *testing.T) {
-	// 1. Setup a map with a wall at (3, 2)
-	// Grid is 7x5
-	layout := `
+func TestCastRay(t *testing.T) {
+	// 1. Define our facility layouts
+	layouts := map[string]string{
+		"small_room": `
 .......
 .......
 ...#...
 .......
-.......
-`
-	m := newTestMap(layout)
-
-	// 2. Cast a ray from left to right, passing through the wall
-	startX, startY := 0, 2
-	endX, endY := 6, 2
-	m.castRay(startX, startY, endX, endY)
-
-	// 3. Log the visual output so you can see it in 'go test -v'
-	fmt.Printf("Ray from (%d,%d) to (%d,%d):\n%s", startX, startY, endX, endY, InspectVisibility(m))
-
-	// 4. Verification Logic
-	// Tile (3,2) should be Visible (the ray hit it)
-	if !m.Tiles[3+2*m.Width].Visible {
-		t.Errorf("Wall at (3,2) should be visible (hit by ray)")
+.......`,
+		"large_corridor": `
+......................
+......................
+.........####.........
+......................
+......................
+......................`,
 	}
 
-	// Tile (4,2) should NOT be visible (it's behind the wall)
-	if m.Tiles[4+2*m.Width].Visible {
-		t.Errorf("Tile at (4,2) should be hidden behind the wall")
+	// 2. Define the test cases
+	tests := []struct {
+		name       string
+		layoutName string
+		x0, y0     int
+		x1, y1     int
+		wantVis    []Point // Tiles that MUST be visible
+		wantHidden []Point // Tiles that MUST NOT be visible (behind walls)
+	}{
+		{
+			name:       "blocked-horizontal",
+			layoutName: "small_room",
+			x0:         0, y0: 2, x1: 6, y1: 2,
+			wantVis:    []Point{{0, 2}, {3, 2}}, // Start and the Wall itself
+			wantHidden: []Point{{4, 2}, {5, 2}}, // Points behind the wall
+		},
+		{
+			name:       "clear-path-vertical",
+			layoutName: "small_room",
+			x0:         1, y0: 0, x1: 1, y1: 4,
+			wantVis:    []Point{{1, 0}, {1, 2}, {1, 4}},
+			wantHidden: []Point{},
+		},
+		{
+			name:       "long-range-obscured",
+			layoutName: "large_corridor",
+			x0:         2, y0: 2, x1: 20, y1: 2,
+			wantVis:    []Point{{2, 2}, {9, 2}},
+			wantHidden: []Point{{10, 2}, {15, 2}, {20, 2}},
+		},
 	}
 
-	// Tile (0,2) should be visible (origin)
-	if !m.Tiles[0+2*m.Width].Visible {
-		t.Error("Starting tile should be visible")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Initialize map from our library
+			layout, ok := layouts[tt.layoutName]
+			if !ok {
+				t.Fatalf("Layout %s not found", tt.layoutName)
+			}
+			m := newTestMap(layout)
+
+			// Fire the ray
+			m.castRay(tt.x0, tt.y0, tt.x1, tt.y1)
+
+			// Log the visual state for inspection on failure or -v
+			t.Logf("\nTest: %s (Map: %s)\nRay: (%d,%d) -> (%d,%d)\n%s",
+				tt.name, tt.layoutName, tt.x0, tt.y0, tt.x1, tt.y1, InspectVisibility(m))
+
+			// Check expected visible points
+			for _, p := range tt.wantVis {
+				idx := p.X + p.Y*m.Width
+				if !m.Tiles[idx].Visible {
+					t.Errorf("Expected point {%d, %d} to be visible, but it was hidden", p.X, p.Y)
+				}
+			}
+
+			// Check expected hidden points
+			for _, p := range tt.wantHidden {
+				idx := p.X + p.Y*m.Width
+				if m.Tiles[idx].Visible {
+					t.Errorf("Expected point {%d, %d} to be hidden, but it was visible", p.X, p.Y)
+				}
+			}
+		})
 	}
 }
