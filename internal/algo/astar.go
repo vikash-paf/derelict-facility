@@ -13,56 +13,94 @@ func ManhattanDistance(p1, p2 entity.Point) int {
 	return math.Abs(p1.X-p2.X) + math.Abs(p1.Y-p2.Y)
 }
 
-// FindPath returns list of points representing the shortest path.
 func FindPath(m *world.Map, start, target entity.Point) []entity.Point {
-	// 1. Setup the Open Set (tiles to evaluate) and Closed Set (tiles already evaluated)
+	// Total number of tiles
+	mapArea := m.Width * m.Height
+
+	// Replace maps with pre-allocated slices for O(1) access without hashing
+	closedSet := make([]bool, mapArea)
+	openSetTracker := make([]*Node, mapArea)
+
 	openSet := make(PriorityQueue, 0)
 	heap.Init(&openSet)
 
-	// We use a map for the closed set for O(1) lookups. Key: "x,y" string or a 1D index.
-	// For performance, a 1D index (y * width + x) is best!
-	// closedSet := make(map[int]bool)
-
-	// 2. Add the start node to the open set
 	startNode := &Node{
 		Point: start,
 		GCost: 0,
 		HCost: ManhattanDistance(start, target),
 	}
 	startNode.FCost = startNode.GCost + startNode.HCost
-	heap.Push(&openSet, startNode)
 
-	// Keep track of nodes in the open set to update them if we find a faster route
-	openSetTracker := make(map[int]*Node)
+	heap.Push(&openSet, startNode)
 	openSetTracker[start.Y*m.Width+start.X] = startNode
 
-	// 3. The Search Loop
 	for openSet.Len() > 0 {
-		// TODO: Pop the node with the lowest FCost from openSet using:
-		// currentNode := heap.Pop(&openSet).(*Node)
+		currentNode := heap.Pop(&openSet).(*Node)
+		currIdx := currentNode.Point.Y*m.Width + currentNode.Point.X
 
-		// TODO: Remove currentNode from openSetTracker
+		// Mark as nil in tracker since it's no longer "Open"
+		openSetTracker[currIdx] = nil
 
-		// TODO: Calculate 1D index of currentNode and add it to closedSet
+		if currentNode.Point == target {
+			return reconstructPath(currentNode)
+		}
 
-		// TODO: Are we at the target?
-		// If currentNode.Point == target:
-		// We won! Reconstruct the path by following currentNode.Parent backward,
-		// reverse the slice, and return it.
+		closedSet[currIdx] = true
 
-		// TODO: Get neighbors (Up, Down, Left, Right).
-		// For each neighbor:
-		//   1. Check if it's outside the map or Walkable == false. If so, ignore.
-		//   2. Calculate its 1D index. Is it in the closedSet? If so, ignore.
-		//   3. Calculate new GCost = currentNode.GCost + 1
-		//   4. Check if neighbor is in openSetTracker.
-		//      - If not: Create a new Node, set its Parent to currentNode, calculate G, H, F.
-		//                Push it to openSet and add to openSetTracker.
-		//      - If it IS in openSetTracker, but this new GCost is LOWER than its current GCost:
-		//                Update its GCost, FCost, and Parent.
-		//                Call heap.Fix(&openSet, neighborNode.HeapIndex) to re-sort the queue.
+		// Neighbors: N, S, W, E
+		dx := []int{0, 0, -1, 1}
+		dy := []int{-1, 1, 0, 0}
+
+		for i := 0; i < 4; i++ {
+			nx, ny := currentNode.Point.X+dx[i], currentNode.Point.Y+dy[i]
+
+			// Boundary and Walkability check
+			if nx < 0 || ny < 0 || nx >= m.Width || ny >= m.Height {
+				continue
+			}
+
+			nIdx := ny*m.Width + nx
+			if closedSet[nIdx] || !m.Tiles[nIdx].Walkable {
+				continue
+			}
+
+			newGCost := currentNode.GCost + 1
+			neighborNode := openSetTracker[nIdx]
+
+			if neighborNode == nil {
+				// New Node
+				newNode := &Node{
+					Point:  entity.Point{X: nx, Y: ny},
+					Parent: currentNode,
+					GCost:  newGCost,
+					HCost:  ManhattanDistance(entity.Point{X: nx, Y: ny}, target),
+				}
+				newNode.FCost = newNode.GCost + newNode.HCost
+				heap.Push(&openSet, newNode)
+				openSetTracker[nIdx] = newNode
+			} else if newGCost < neighborNode.GCost {
+				// Improved path
+				neighborNode.Parent = currentNode
+				neighborNode.GCost = newGCost
+				neighborNode.FCost = newGCost + neighborNode.HCost
+				heap.Fix(&openSet, neighborNode.HeapIndex)
+			}
+		}
 	}
-
-	// No path found!
 	return nil
+}
+
+// reconstructPath follows the parent pointers back to the start.
+func reconstructPath(endNode *Node) []entity.Point {
+	var path []entity.Point
+	curr := endNode
+	for curr != nil {
+		path = append(path, curr.Point)
+		curr = curr.Parent
+	}
+	// The path is currently [target -> start], we need [start -> target]
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+	return path
 }
