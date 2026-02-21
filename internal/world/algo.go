@@ -1,5 +1,9 @@
 package world
 
+import (
+	"github.com/vikash-paf/derelict-facility/internal/math"
+)
+
 // getLine uses Bresenham's Line Algorithm to return all points between A and B.
 // Think of this as charting a laser beam or line-of-sight across your facility's floor grid.
 // Read more: https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
@@ -8,11 +12,11 @@ func getLine(x0, y0, x1, y1 int) []Point {
 
 	// Calculate the absolute distances between the start and end points.
 	// dx is the total horizontal distance.
-	dx := abs(x1 - x0)
+	dx := math.Abs(x1 - x0)
 
 	// dy is the total vertical distance. We make it negative here as a math trick
 	// so we can simply add it to our 'error' tracker later instead of subtracting.
-	dy := -abs(y1 - y0)
+	dy := -math.Abs(y1 - y0)
 
 	// Determine the step direction for the X-axis (left or right).
 	// Default to stepping left (-1). If the destination is to the right, change to stepping right (1).
@@ -62,13 +66,4 @@ func getLine(x0, y0, x1, y1 int) []Point {
 
 	// Return the complete charted path to the caller.
 	return points
-}
-
-// abs returns the absolute (positive) value of an integer.
-// This is essential for calculating pure distances across the grid, regardless of direction.
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
 }
