@@ -8,6 +8,10 @@ const (
 	PlayerStatusHurt
 )
 
+const (
+	playerCharacter = "🚶"
+)
+
 func NewPlayer(x, y int, status PlayerStatus) *Player {
 	return &Player{x, y, status}
 }
@@ -21,12 +25,12 @@ func (p *Player) Render() string {
 	switch p.Status {
 	case PlayerStatusSick:
 		// A sickly, toxic green
-		return Green + "@" + Reset
+		return Green + playerCharacter + Reset
 	case PlayerStatusHurt:
 		// A flashing red warning
-		return Red + "@" + Reset
+		return Red + playerCharacter + Reset
 	default:
 		// A bright, healthy white or cyan so they pop against the background
-		return Cyan + "@" + Reset
+		return Cyan + playerCharacter + Reset
 	}
 }
