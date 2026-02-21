@@ -21,3 +21,7 @@ func New(id int, name string, x, y int) *Entity {
 type Point struct {
 	X, Y int // the coordinates on the map
 }
+
+func (p Point) ToIndex(width int) int {
+	return p.Y*width + p.X
+}
