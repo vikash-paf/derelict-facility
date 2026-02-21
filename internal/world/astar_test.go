@@ -95,3 +95,24 @@ func TestFindPath_Regression_HeapIndex(t *testing.T) {
 		t.Errorf("Failed basic connectivity with HeapIndex logic")
 	}
 }
+
+func TestVisual_PathfindingCorridor(t *testing.T) {
+	// Setup a 10x10 map with a wall creating a narrow corridor
+	walls := []entity.Point{
+		{X: 5, Y: 0}, {X: 5, Y: 1}, {X: 5, Y: 2}, {X: 5, Y: 3}, {X: 5, Y: 4},
+		{X: 5, Y: 6}, {X: 5, Y: 7}, {X: 5, Y: 8}, {X: 5, Y: 9},
+	}
+	m := setupTestMap(11, 10, walls) // Width 11 to give room on both sides
+
+	start := entity.Point{X: 2, Y: 5}
+	target := entity.Point{X: 9, Y: 1}
+
+	path := FindPath(m, start, target)
+
+	if len(path) == 0 {
+		t.Error("Failed to find path through the gap")
+	}
+
+	// This is the visual confirmation
+	VisualizePath(m, path, start, target)
+}
