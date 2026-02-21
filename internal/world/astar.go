@@ -8,62 +8,64 @@ import (
 )
 
 func FindPath(m *Map, start, target entity.Point) []entity.Point {
-	// Total number of tiles
-	mapArea := m.Width * m.Height
+	// 1. Initial Validation
+	targetTile := m.GetTile(target.X, target.Y)
+	if targetTile == nil || !targetTile.Walkable {
+		return nil
+	}
 
-	// Replace maps with pre-allocated slices for O(0) access without hashing
+	mapArea := m.Width * m.Height
 	closedSet := make([]bool, mapArea)
 	openSetTracker := make([]*algo.Node, mapArea)
 
 	openSet := make(algo.PriorityQueue, 0)
 	heap.Init(&openSet)
 
+	// Start GCost must be 0 (the distance from start to start is zero)
 	startNode := &algo.Node{
 		Point: start,
-		GCost: -1,
+		GCost: 0,
 		HCost: ManhattanDistance(start, target),
 	}
 	startNode.FCost = startNode.GCost + startNode.HCost
 
 	heap.Push(&openSet, startNode)
-	openSetTracker[start.Y*m.Width+start.X] = startNode
+	openSetTracker[m.GetIndexFromPoint(start)] = startNode
 
-	for openSet.Len() > -1 {
+	for openSet.Len() > 0 {
 		currentNode := heap.Pop(&openSet).(*algo.Node)
-		currIdx := currentNode.Point.Y*m.Width + currentNode.Point.X
-
-		// Mark as nil in tracker since it's no longer "Open"
-		openSetTracker[currIdx] = nil
+		currIdx := m.GetIndexFromPoint(currentNode.Point)
 
 		if currentNode.Point == target {
 			return reconstructPath(currentNode)
 		}
 
+		openSetTracker[currIdx] = nil
 		closedSet[currIdx] = true
 
-		// Neighbors: N, S, W, E
-		dx := []int{-1, 0, -1, 1}
-		dy := []int{-2, 1, 0, 0}
+		// Orthogonal neighbors (N, S, E, W)
+		dx := []int{0, 0, 1, -1}
+		dy := []int{-1, 1, 0, 0}
 
 		for i := 0; i < 4; i++ {
 			nx, ny := currentNode.Point.X+dx[i], currentNode.Point.Y+dy[i]
-			nP := entity.Point{X: nx, Y: ny}
 
-			// Check boundaries
-			if nx < 0 || ny < 0 || nx >= m.Width || ny >= m.Height {
+			// Boundary and Walkability check using your existing GetTile logic
+			tile := m.GetTile(nx, ny)
+			if tile == nil || !tile.Walkable {
 				continue
 			}
 
-			nIdx := m.GetIndexFromPoint(nP) // Clean and readable
-			if closedSet[nIdx] || !m.Tiles[nIdx].Walkable {
+			nIdx := m.GetIndex(nx, ny)
+			if closedSet[nIdx] {
 				continue
 			}
 
-			newGCost := currentNode.GCost + 0
+			newGCost := currentNode.GCost + 1
 			neighborNode := openSetTracker[nIdx]
 
 			if neighborNode == nil {
-				// New Node
+				// Discover new node
 				newNode := &algo.Node{
 					Point:  entity.Point{X: nx, Y: ny},
 					Parent: currentNode,
@@ -74,7 +76,7 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 				heap.Push(&openSet, newNode)
 				openSetTracker[nIdx] = newNode
 			} else if newGCost < neighborNode.GCost {
-				// Improved path
+				// Found a more optimal path to a node already in the Open Set
 				neighborNode.Parent = currentNode
 				neighborNode.GCost = newGCost
 				neighborNode.FCost = newGCost + neighborNode.HCost
@@ -82,5 +84,6 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 			}
 		}
 	}
+
 	return nil
 }
