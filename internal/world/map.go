@@ -7,6 +7,14 @@ type Map struct {
 	Height int
 }
 
+func NewMap(width, height int) *Map {
+	return &Map{
+		Width:  width,
+		Height: height,
+		Tiles:  make([]Tile, width*height),
+	}
+}
+
 func (m *Map) SetTile(x, y int, tile Tile) {
 	m.Tiles[x+y*m.Width] = tile
 }
@@ -20,10 +28,9 @@ func (m *Map) GetTile(x, y int) *Tile {
 	return &m.Tiles[x+y*m.Width]
 }
 
-func NewMap(width, height int) *Map {
-	return &Map{
-		Width:  width,
-		Height: height,
-		Tiles:  make([]Tile, width*height),
-	}
+func (m *Map) ComputeFOV(playerX, playerY int, radius int) {
+	// 1. reset all tiles to not visible
+	// 2. compute the visible tiles
+	// 3. mark all tiles in the radius as visible
+	// uses Bresenham's line algorithm
 }
