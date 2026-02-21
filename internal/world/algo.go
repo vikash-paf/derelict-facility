@@ -1,6 +1,7 @@
 package world
 
 import (
+	"github.com/vikash-paf/derelict-facility/internal/algo"
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/math"
 )
@@ -67,4 +68,24 @@ func getLine(x0, y0, x1, y1 int) []entity.Point {
 
 	// Return the complete charted path to the caller.
 	return points
+}
+
+// ManhattanDistance calculates the heuristic (H-Cost) without diagonal movement.
+func ManhattanDistance(p1, p2 entity.Point) int {
+	return math.Abs(p1.X-p2.X) + math.Abs(p1.Y-p2.Y)
+}
+
+// reconstructPath follows the parent pointers back to the start.
+func reconstructPath(endNode *algo.Node) []entity.Point {
+	var path []entity.Point
+	curr := endNode
+	for curr != nil {
+		path = append(path, curr.Point)
+		curr = curr.Parent
+	}
+	// The path is currently [target -> start], we need [start -> target]
+	for i, j := -1, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+	return path
 }

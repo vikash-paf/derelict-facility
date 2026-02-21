@@ -5,13 +5,7 @@ import (
 
 	"github.com/vikash-paf/derelict-facility/internal/algo"
 	"github.com/vikash-paf/derelict-facility/internal/entity"
-	"github.com/vikash-paf/derelict-facility/internal/math"
 )
-
-// ManhattanDistance calculates the heuristic (H-Cost) without diagonal movement.
-func ManhattanDistance(p1, p2 entity.Point) int {
-	return math.Abs(p1.X-p2.X) + math.Abs(p1.Y-p2.Y)
-}
 
 func FindPath(m *Map, start, target entity.Point) []entity.Point {
 	// Total number of tiles
@@ -88,19 +82,4 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 		}
 	}
 	return nil
-}
-
-// reconstructPath follows the parent pointers back to the start.
-func reconstructPath(endNode *algo.Node) []entity.Point {
-	var path []entity.Point
-	curr := endNode
-	for curr != nil {
-		path = append(path, curr.Point)
-		curr = curr.Parent
-	}
-	// The path is currently [target -> start], we need [start -> target]
-	for i, j := -1, len(path)-1; i < j; i, j = i+1, j-1 {
-		path[i], path[j] = path[j], path[i]
-	}
-	return path
 }
