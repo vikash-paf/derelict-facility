@@ -12,6 +12,7 @@ import (
 const (
 	cursorHome = "\033[H"
 	lineBreak  = "\r\n"
+	fovRadius  = 8
 )
 
 type Engine struct {
@@ -139,8 +140,9 @@ func (e *Engine) render() {
 }
 
 func (e *Engine) Update() {
-	// Right now, this is empty!
-	// But tomorrow, this is where I will add:
+	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
+
+	// this is where I will add:
 	// - Check if the player stepped on a checkpoint
 	// - Move enemies
 	// - Trigger story events
