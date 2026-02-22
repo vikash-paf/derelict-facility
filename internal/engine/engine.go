@@ -193,13 +193,14 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			// 2. Map TileType to a Sprite Coordinate
-			// Using 128px tilesheet coordinates:
+			// Using compact 4x4 tileset.png coordinates:
 			sheetX, sheetY := -1, -1
 			switch tile.Type {
 			case world.TileTypeWall:
-				sheetX, sheetY = 0, 4 // Solid rusty wall panel (index 4 in 128px grid)
+				sheetX, sheetY = 0, 1 // Rusty Metal Door/Wall (Row 2, Column 1)
 			case world.TileTypeFloor:
-				sheetX, sheetY = 0, 0 // Grille floor (index 0 in 128px grid)
+				sheetY = 0
+				sheetX = 0 // Plain Metal Panel (Row 1, Column 1)
 			case world.TileTypeEmpty:
 				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
 			}

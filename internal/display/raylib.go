@@ -49,7 +49,7 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		r.Font = rl.GetFontDefault()
 	}
 
-	r.Tileset = rl.LoadTexture("assets/derelict_spritesheet.png")
+	r.Tileset = rl.LoadTexture("assets/tileset.png")
 	rl.SetTextureFilter(r.Tileset, rl.FilterPoint) // CRITICAL: Fixes gaps and blurring in pixel art
 
 	return nil
@@ -96,13 +96,16 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 	rl.DrawTextEx(r.Font, text, position, float32(r.FontSize), 1, rl.GetColor(uint(colorHex)))
 }
 
-// DrawSprite cuts a 128x128 frame out of the Tileset atlas and draws it to the screen grid.
+// DrawSprite cuts a frame out of the 4x4 Tileset atlas and draws it to the screen grid.
 func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32) {
-	// Diagnosis: The spritesheet is actually a 128x128 grid (22x12 tiles).
-	spriteSize := float32(128)
+	// Dynamically calculate the tile size based on the texture dimensions (assuming 4x4 grid)
+	spriteWidth := float32(r.Tileset.Width) / 4.0
+	spriteHeight := float32(r.Tileset.Height) / 4.0
 
-	sourceRec := rl.NewRectangle(float32(sheetX)*spriteSize, float32(sheetY)*spriteSize, spriteSize, spriteSize)
+	// Where to cut the artwork on the giant sprite sheet
+	sourceRec := rl.NewRectangle(float32(sheetX)*spriteWidth, float32(sheetY)*spriteHeight, spriteWidth, spriteHeight)
 
+	// Where to draw the artwork on the game screen
 	destRec := rl.NewRectangle(
 		float32(int32(gridX)*r.CellWidth),
 		float32(int32(gridY)*r.CellHeight),
