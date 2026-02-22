@@ -267,9 +267,9 @@ func (e *Engine) renderHUD() {
 		if ctrlRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePlayerControl); ctrlRaw != nil {
 			ctrl := ctrlRaw.(*components.PlayerControl)
 			autopilotEngaged = ctrl.Autopilot
-			if ctrl.Status == world.PlayerStatusSick {
+			if ctrl.Status == components.PlayerStatusSick {
 				statusText = "SICK / TOXIC"
-			} else if ctrl.Status == world.PlayerStatusHurt {
+			} else if ctrl.Status == components.PlayerStatusHurt {
 				statusText = "CRITICAL"
 			}
 		}

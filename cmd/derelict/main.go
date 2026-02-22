@@ -41,7 +41,7 @@ func main() {
 	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "@", ColorCode: world.Green})
 	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
 		Autopilot: false,
-		Status:    world.PlayerStatusHealthy,
+		Status:    components.PlayerStatusHealthy,
 	})
 
 	// 4. Hand everything to the Engine

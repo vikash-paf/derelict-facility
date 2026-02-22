@@ -2,7 +2,6 @@ package components
 
 import (
 	"github.com/vikash-paf/derelict-facility/internal/entity"
-	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
 // The Component Names as constants to prevent typos
@@ -10,6 +9,15 @@ const (
 	NamePosition      = "Position"
 	NameRenderable    = "Renderable"
 	NamePlayerControl = "PlayerControl"
+)
+
+// PlayerStatus represents the health/condition of a player entity.
+type PlayerStatus uint8
+
+const (
+	PlayerStatusHealthy PlayerStatus = iota
+	PlayerStatusSick
+	PlayerStatusHurt
 )
 
 // Position holds exactly where an Entity is on the grid.
@@ -29,5 +37,5 @@ type Renderable struct {
 type PlayerControl struct {
 	Autopilot   bool
 	CurrentPath []entity.Point
-	Status      world.PlayerStatus
+	Status      PlayerStatus
 }
