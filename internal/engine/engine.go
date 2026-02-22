@@ -2,8 +2,10 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/entity"
@@ -297,6 +299,36 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			e.screen.WriteString(lineBreak)
 		}
 	}
+}
+
+func (e *Engine) renderHUD() {
+	// The Y-coordinate where the map ends and the HUD begins
+	hudY := e.Map.Height
+
+	// strings.Repeat is a highly optimized Go standard library function
+	divider := strings.Repeat("═", e.Map.Width)
+	e.drawText(0, hudY, divider, world.Gray)
+
+	statusText := "HEALTHY"
+	if e.Player.Status == world.PlayerStatusSick {
+		statusText = "SICK / TOXIC"
+	} else if e.Player.Status == world.PlayerStatusHurt {
+		statusText = "CRITICAL"
+	}
+	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), world.Cyan)
+
+	if e.Player.Autopilot {
+		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", world.Red)
+	} else {
+		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]", world.Gray)
+	}
+
+	// %06d formats the integer to always be 6 digits (e.g., 000142)
+	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
+	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, world.White)
+
+	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
+	e.drawText(2, hudY+2, controls, world.Gray)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color string) {
