@@ -16,8 +16,8 @@ const (
 	playerCharacter = "@"
 )
 
-func NewPlayer(x, y int, status PlayerStatus) *Player {
-	return &Player{X: x, Y: y, Status: status}
+func NewPlayer(x int, y int, status PlayerStatus, autopilot bool) *Player {
+	return &Player{X: x, Y: y, Status: status, Autopilot: autopilot}
 }
 
 type Player struct {
