@@ -2,9 +2,11 @@ package engine
 
 import (
 	"bytes"
+	"math/rand"
 	"os"
 	"time"
 
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -162,6 +164,7 @@ func (e *Engine) Update() {
 	// Run AI movement every 6th frame (approx 5 times a second)
 	if e.Player.Autopilot && e.tickCount%6 == 0 {
 		// run autopilot
+		e.processAutopilot()
 	}
 
 	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
@@ -171,4 +174,44 @@ func (e *Engine) Update() {
 	// - Move enemies
 	// - Trigger story events
 	// - Update flashing light animations
+}
+
+func (e *Engine) processAutopilot() {
+	// 1. If we don't have a path, find a new destination!
+	if len(e.Player.CurrentPath) == 0 {
+		// Pick a random room
+		targetRoom := e.Map.Rooms[rand.Intn(len(e.Map.Rooms))]
+		targetX, targetY := targetRoom.Center()
+
+		start := entity.Point{X: e.Player.X, Y: e.Player.Y}
+		target := entity.Point{X: targetX, Y: targetY}
+
+		// Calculate the path
+		path := world.FindPath(e.Map, start, target)
+
+		// A* returns the starting node as index 0. We slice it off so we don't stand still.
+		if len(path) > 1 {
+			e.Player.CurrentPath = path[1:]
+		} else {
+			e.Player.CurrentPath = nil // We are already there, or trapped
+		}
+		
+		return
+	}
+
+	// 2. Take the next step in the path
+	nextStep := e.Player.CurrentPath[0]
+
+	// Ensure the tile is still walkable (in case a door closed or enemy moved there)
+	if e.Map.IsWalkable(nextStep.X, nextStep.Y) {
+		e.Player.X = nextStep.X
+		e.Player.Y = nextStep.Y
+	} else {
+		// Path is blocked! Clear it so we recalculate next tick.
+		e.Player.CurrentPath = nil
+		return
+	}
+
+	// 3. Pop the step we just took off the slice
+	e.Player.CurrentPath = e.Player.CurrentPath[1:]
 }
