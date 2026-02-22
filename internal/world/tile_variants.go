@@ -102,3 +102,9 @@ var TileVariantAsh = TileVariant{
 	TileTypeWall:  "\x1b[37m▓\x1b[0m", // White frosted walls
 	TileTypeFloor: "\x1b[90m*\x1b[0m", // Grey asterisks for ash/snow
 }
+
+var TileVariantPaused = TileVariant{
+	TileTypeFloor: "\033[90m░\033[0m", // Dark Gray Floor
+	TileTypeWall:  "\033[90m▓\033[0m", // Dark Gray Wall
+	TileTypeEmpty: " ",
+}

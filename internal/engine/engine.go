@@ -219,11 +219,17 @@ func (e *Engine) render() {
 	e.screen.Reset()
 	e.screen.WriteString(cursorHome)
 
+	renderTheme := e.Theme
+
+	if e.State == GameStatePaused {
+		renderTheme = world.TileVariantPaused
+	}
+	e.renderMapLayer(renderTheme)
 	switch e.State {
 	case GameStatePaused:
 		e.renderPauseMenu()
 	case GameStateRunning:
-		e.renderMapLayer()
+
 	}
 
 	// e.renderHUD() // todo: implement HUD
@@ -237,7 +243,7 @@ func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(17, "Press [Q] to Quit", world.Gray)
 }
 
-func (e *Engine) renderMapLayer() {
+func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	pathLookup := make(map[int]bool)
 	if e.Player.Autopilot {
 		for _, p := range e.Player.CurrentPath {
@@ -269,19 +275,19 @@ func (e *Engine) renderMapLayer() {
 
 			// 2. Render the map tiles
 			if tile.Visible {
-				e.screen.WriteString(e.Theme[tile.Type])
+				e.screen.WriteString(theme[tile.Type])
 				continue
 			}
 
 			if tile.Explored {
 				// We wrap the character in Gray and Reset to "dim" the lights
 				// Note: We use the character from Classic to keep the 'memory' simple
-				char := e.Theme[tile.Type]
+				char := theme[tile.Type]
 				e.screen.WriteString(world.Gray + char + world.Reset)
 				continue
 			}
 
-			e.screen.WriteString(e.Theme[world.TileTypeEmpty])
+			e.screen.WriteString(theme[world.TileTypeEmpty])
 		}
 
 		e.screen.WriteString(lineBreak)
