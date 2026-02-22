@@ -27,7 +27,7 @@ func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *R
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
-	rl.SetTargetFPS(60)
+	rl.SetTargetFPS(30)
 	rl.SetExitKey(0) // Disable the default Escape key exit behavior
 
 	if r.FontPath != "" {

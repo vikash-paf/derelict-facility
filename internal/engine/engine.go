@@ -14,9 +14,7 @@ import (
 )
 
 const (
-	cursorHome = "\033[H"
-	lineBreak  = "\r\n"
-	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
+	fovRadius = 8 // cool stuff can be done here, like a dimming torch light
 )
 
 type GameState uint8
