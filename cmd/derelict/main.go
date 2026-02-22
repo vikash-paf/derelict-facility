@@ -34,7 +34,7 @@ func main() {
 	player := world.NewPlayer(playerX, playerY, world.PlayerStatusHealthy, false)
 
 	// 3. Hand them to the Engine
-	gameEngine := engine.NewEngine(term, generatedMap, player, world.TileVariantSolid)
+	gameEngine := engine.NewEngine(term, generatedMap, player, world.TileVariantCold)
 
 	err = gameEngine.Run()
 	if err != nil {
