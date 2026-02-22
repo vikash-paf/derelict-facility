@@ -83,7 +83,7 @@ func (t *Terminal) PollInput() <-chan InputEvent {
 			}
 
 			// Catch Ctrl+C (ASCII value 3) or ESC (ASCII value 27)
-			if b[0] == 3 || b[0] == 27 {
+			if b[0] == 3 {
 				events <- InputEvent{Quit: true}
 				continue
 			}

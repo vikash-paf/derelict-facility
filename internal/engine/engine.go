@@ -105,7 +105,7 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 	case 'q':
 		e.Running = false
 		return
-	case 'x':
+	case 27:
 		// handle the escape button to toggle the game state
 		if e.State == GameStateRunning {
 			e.State = GameStatePaused
@@ -114,7 +114,7 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 		}
 	}
 
-	if dx != 0 || dy != 0 {
+	if e.State == GameStateRunning && dx != 0 || dy != 0 {
 		e.movePlayer(dx, dy)
 	}
 }
