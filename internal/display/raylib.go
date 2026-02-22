@@ -29,34 +29,28 @@ func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *R
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
-	rl.SetTargetFPS(30)
-	rl.SetExitKey(0) // Disable the default Escape key exit behavior
+	rl.SetTargetFPS(60)
+	rl.SetExitKey(0)
 
 	if r.FontPath != "" {
-		// Define the characters we want to load from the font
 		var fontChars []rune
 		for i := int32(32); i <= 126; i++ {
 			fontChars = append(fontChars, rune(i))
 		}
-		// Add some extended box drawing and roguelike characters, plus the emojis
 		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', '👷'}
 		fontChars = append(fontChars, extraChars...)
 
 		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
-		rl.SetTextureFilter(r.Font.Texture, rl.FilterBilinear)
+		rl.SetTextureFilter(r.Font.Texture, rl.FilterPoint) // Pixel perfect text
 
-		// Load the Noto Emoji font for fallback
 		fallbackPath := "assets/fonts/NotoEmoji-Regular.ttf"
-		// Raylib doesn't have a direct SetFontFallback in its current Go bindings,
-		// but we can manage drawing fallbacks ourselves if needed, or rely on OS defaults.
-		// Wait, rl-go does have it:
 		r.FallbackFont = rl.LoadFontEx(fallbackPath, r.FontSize, fontChars)
 	} else {
 		r.Font = rl.GetFontDefault()
 	}
 
-	// Load the professionally drawn Kenney tileset with true transparency
-	r.Tileset = rl.LoadTexture("assets/kenney_sci-fi-rts/Tilesheet/scifi_tilesheet.png")
+	r.Tileset = rl.LoadTexture("assets/derelict_spritesheet.png")
+	rl.SetTextureFilter(r.Tileset, rl.FilterPoint) // CRITICAL: Fixes gaps and blurring in pixel art
 
 	return nil
 }
@@ -93,41 +87,22 @@ func (r *RaylibDisplay) Clear(colorHex uint32) {
 func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
 	pixelY := int32(gridY) * r.CellHeight
 
-	colOffset := 0
-	for _, char := range text {
-		charStr := string(char)
+	// Roger-style roguelikes use character-per-cell grid.
+	// However, with large sprite cells, we want the text to be compact.
+	// We will draw the entire string starting at the cell's top-left,
+	// but we WON'T jump a full CellWidth per character.
 
-		vecSize := rl.MeasureTextEx(r.Font, charStr, float32(r.FontSize), 0)
-		charWidth := int32(vecSize.X)
-
-		// Center character horizontally in the cell
-		pixelX := int32(gridX+colOffset)*r.CellWidth + (r.CellWidth-charWidth)/2
-		position := rl.NewVector2(float32(pixelX), float32(pixelY))
-
-		// If the main font didn't load a glyph for this character, it returns an index of 0 (the '?')
-		// We can check rl.GetGlyphIndex(r.Font, char) to see if it exists.
-		glyphIndex := rl.GetGlyphIndex(r.Font, char)
-		if glyphIndex == 0 && r.FallbackFont.Texture.ID != 0 && rl.GetGlyphIndex(r.FallbackFont, char) != 0 {
-			rl.DrawTextEx(r.FallbackFont, charStr, position, float32(r.FontSize), 0, rl.GetColor(uint(colorHex)))
-		} else {
-			rl.DrawTextEx(r.Font, charStr, position, float32(r.FontSize), 0, rl.GetColor(uint(colorHex)))
-		}
-
-		colOffset++
-	}
+	position := rl.NewVector2(float32(int32(gridX)*r.CellWidth), float32(pixelY))
+	rl.DrawTextEx(r.Font, text, position, float32(r.FontSize), 1, rl.GetColor(uint(colorHex)))
 }
 
-// DrawSprite cuts a 64x64 frame out of the Tileset atlas and draws it to the screen grid.
+// DrawSprite cuts a 128x128 frame out of the Tileset atlas and draws it to the screen grid.
 func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32) {
-	// The kenney sprites are 64x64 grids
-	spriteSize := float32(64)
+	// Diagnosis: The spritesheet is actually a 128x128 grid (22x12 tiles).
+	spriteSize := float32(128)
 
-	// Where to cut the artwork on the giant sprite sheet
 	sourceRec := rl.NewRectangle(float32(sheetX)*spriteSize, float32(sheetY)*spriteSize, spriteSize, spriteSize)
 
-	// Where to draw the artwork on the game screen
-	// Note: We might need to stretch/squash it to fit our current grid cells, or draw it native 64x64!
-	// Let's stretch it to fit our `r.CellWidth` and `r.CellHeight` exactly for now
 	destRec := rl.NewRectangle(
 		float32(int32(gridX)*r.CellWidth),
 		float32(int32(gridY)*r.CellHeight),
@@ -135,15 +110,12 @@ func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHe
 		float32(r.CellHeight),
 	)
 
-	// Pivot point is top-left
 	origin := rl.NewVector2(0, 0)
-
 	rl.DrawTexturePro(r.Tileset, sourceRec, destRec, origin, 0.0, rl.GetColor(uint(colorHex)))
 }
 
 func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	var events []core.InputEvent
-
 	if rl.IsKeyPressed(rl.KeyW) || rl.IsKeyPressedRepeat(rl.KeyW) {
 		events = append(events, core.InputEvent{Key: core.KeyW})
 	}
@@ -165,51 +137,30 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		events = append(events, core.InputEvent{Key: core.KeyEsc})
 	}
-
 	return events
 }
 
-// MapANSIColor Helper method for Color Mapper
 func MapANSIColor(ansiColor string) uint32 {
 	colorMap := map[string]uint32{
-		world.Red:         0xFF0000FF,
-		world.Green:       0x00FF00FF,
-		world.Yellow:      0xFFFF00FF,
-		world.Blue:        0x0000FFFF,
-		world.Magenta:     0xFF00FFFF,
-		world.Cyan:        0x00FFFFFF,
-		world.White:       0xFFFFFFFF,
-		world.Gray:        0x808080FF,
-		world.BrightWhite: 0xFFFFFFFF,
+		world.Red: 0xFF0000FF, world.Green: 0x00FF00FF, world.Yellow: 0xFFFF00FF,
+		world.Blue: 0x0000FFFF, world.Magenta: 0xFF00FFFF, world.Cyan: 0x00FFFFFF,
+		world.White: 0xFFFFFFFF, world.Gray: 0x808080FF, world.BrightWhite: 0xFFFFFFFF,
 	}
-
 	if hex, ok := colorMap[ansiColor]; ok {
 		return hex
 	}
-	return 0xFFFFFFFF // default white
+	return 0xFFFFFFFF
 }
 
-// ExtractTextAndColor takes a string like "\x1b[31m*\x1b[0m" and returns ("*", 0xFF0000FF).
-// If it's a plain string like " ", it returns (" ", 0xFFFFFFFF)
 func ExtractTextAndColor(s string) (string, uint32) {
-	// Simple parsing since the patterns are very consistent: COLOR + CHAR + RESET
-	// Or just plain CHAR
 	if !strings.HasPrefix(s, "\x1b[") && !strings.HasPrefix(s, "\033[") {
-		return s, 0xFFFFFFFF // Plain text, default white
+		return s, 0xFFFFFFFF
 	}
-
-	// We assume color code ends with 'm' and reset is at the end.
-	// Find first 'm'
 	mIdx := strings.Index(s, "m")
 	if mIdx == -1 {
 		return s, 0xFFFFFFFF
 	}
-
 	colorCode := s[:mIdx+1]
-	rest := s[mIdx+1:]
-
-	// Strip the Reset code at the end
-	text := strings.ReplaceAll(rest, world.Reset, "")
-
+	text := strings.ReplaceAll(s[mIdx+1:], world.Reset, "")
 	return text, MapANSIColor(colorCode)
 }

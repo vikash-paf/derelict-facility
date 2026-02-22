@@ -12,12 +12,12 @@ import (
 )
 
 func main() {
-	mapWidth, mapHeight := 60, 30
-	windowWidth, windowHeight := 60, 34 // Extra 4 rows at the bottom for HUD
+	mapWidth, mapHeight := 20, 12
+	windowWidth, windowHeight := 20, 15
 
-	cellWidth := int32(24) // Now square to support sprites!
-	cellHeight := int32(24)
-	fontSize := int32(20)
+	cellWidth := int32(64)
+	cellHeight := int32(64)
+	fontSize := int32(18)
 	fontPath := "assets/fonts/FiraCodeNFBoldMono.ttf"
 
 	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize, fontPath)
@@ -38,7 +38,7 @@ func main() {
 
 	playerEnt := ecsWorld.CreateEntity()
 	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameSprite, &components.Sprite{SheetX: 25, SheetY: 0, ColorCode: world.Magenta})
+	ecsWorld.AddComponent(playerEnt, components.NameSprite, &components.Sprite{SheetX: 0, SheetY: 6, ColorCode: world.White}) // Front-facing engineer (Row 6)
 	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,

@@ -193,13 +193,13 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			// 2. Map TileType to a Sprite Coordinate
-			// Using Kenney Sci-Fi sheet coordinates:
+			// Using 128px tilesheet coordinates:
 			sheetX, sheetY := -1, -1
 			switch tile.Type {
 			case world.TileTypeWall:
-				sheetX, sheetY = 0, 1 // Assuming Row 1 Col 0 is a basic wall block
+				sheetX, sheetY = 0, 4 // Solid rusty wall panel (index 4 in 128px grid)
 			case world.TileTypeFloor:
-				sheetX, sheetY = 1, 0 // Assuming Row 0 Col 1 is a floor panel
+				sheetX, sheetY = 0, 0 // Grille floor (index 0 in 128px grid)
 			case world.TileTypeEmpty:
 				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
 			}
