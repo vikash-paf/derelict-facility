@@ -23,6 +23,7 @@ const (
 	GameStatePaused GameState = iota
 	GameStateRunning
 )
+
 type Engine struct {
 	Terminal   *terminal.Terminal
 	Map        *world.Map
@@ -185,19 +186,25 @@ func (e *Engine) render() {
 func (e *Engine) Update() {
 	e.tickCount++
 
-	// Run AI movement every 2nd frame (approx 15 times a second)
-	if e.Player.Autopilot && e.tickCount%2 == 0 {
-		// run autopilot
-		e.processAutopilot()
+	switch e.State {
+	case GameStatePaused:
+		// do nothing, the world is frozen
+		// later: implement it to save the game
+	case GameStateRunning:
+		// Run AI movement every 2nd frame (approx 15 times a second)
+		if e.Player.Autopilot && e.tickCount%2 == 0 {
+			// run autopilot
+			e.processAutopilot()
+		}
+
+		e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
+
+		// this is where I will add:
+		// - Check if the player stepped on a checkpoint
+		// - Move enemies
+		// - Trigger story events
+		// - Update flashing light animations
 	}
-
-	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
-
-	// this is where I will add:
-	// - Check if the player stepped on a checkpoint
-	// - Move enemies
-	// - Trigger story events
-	// - Update flashing light animations
 }
 
 func (e *Engine) processAutopilot() {
@@ -239,6 +246,7 @@ func (e *Engine) processAutopilot() {
 	// 3. Pop the step we just took off the slice
 	e.Player.CurrentPath = e.Player.CurrentPath[1:]
 }
+
 func (e *Engine) Pause() {
 	e.State = GameStatePaused
 }
