@@ -15,6 +15,7 @@ type RaylibDisplay struct {
 	FontPath     string
 	Font         rl.Font
 	FallbackFont rl.Font
+	Tileset      rl.Texture2D
 }
 
 func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *RaylibDisplay {
@@ -50,10 +51,12 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		// but we can manage drawing fallbacks ourselves if needed, or rely on OS defaults.
 		// Wait, rl-go does have it:
 		r.FallbackFont = rl.LoadFontEx(fallbackPath, r.FontSize, fontChars)
-		// We'll manually handle the fallback in DrawText if rl doesn't.
 	} else {
 		r.Font = rl.GetFontDefault()
 	}
+
+	// Load the brand new beautiful Sci-Fi Graphics!
+	r.Tileset = rl.LoadTexture("assets/kenney_sci-fi-rts/Tilesheet/scifi_tilesheet.png")
 
 	return nil
 }
@@ -64,6 +67,9 @@ func (r *RaylibDisplay) Close() {
 		if r.FallbackFont.Texture.ID != 0 {
 			rl.UnloadFont(r.FallbackFont)
 		}
+	}
+	if r.Tileset.ID != 0 {
+		rl.UnloadTexture(r.Tileset)
 	}
 	rl.CloseWindow()
 }
@@ -109,6 +115,30 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 
 		colOffset++
 	}
+}
+
+// DrawSprite cuts a 64x64 frame out of the Tileset atlas and draws it to the screen grid.
+func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32) {
+	// The kenney sprites are 64x64 grids
+	spriteSize := float32(64)
+
+	// Where to cut the artwork on the giant sprite sheet
+	sourceRec := rl.NewRectangle(float32(sheetX)*spriteSize, float32(sheetY)*spriteSize, spriteSize, spriteSize)
+
+	// Where to draw the artwork on the game screen
+	// Note: We might need to stretch/squash it to fit our current grid cells, or draw it native 64x64!
+	// Let's stretch it to fit our `r.CellWidth` and `r.CellHeight` exactly for now
+	destRec := rl.NewRectangle(
+		float32(int32(gridX)*r.CellWidth),
+		float32(int32(gridY)*r.CellHeight),
+		float32(r.CellWidth),
+		float32(r.CellHeight),
+	)
+
+	// Pivot point is top-left
+	origin := rl.NewVector2(0, 0)
+
+	rl.DrawTexturePro(r.Tileset, sourceRec, destRec, origin, 0.0, rl.GetColor(uint(colorHex)))
 }
 
 func (r *RaylibDisplay) PollInput() []core.InputEvent {

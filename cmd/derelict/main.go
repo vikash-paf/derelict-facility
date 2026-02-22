@@ -38,7 +38,7 @@ func main() {
 
 	playerEnt := ecsWorld.CreateEntity()
 	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "", ColorCode: world.Magenta})
+	ecsWorld.AddComponent(playerEnt, components.NameSprite, &components.Sprite{SheetX: 25, SheetY: 0, ColorCode: world.Magenta}) // Placeholder coordinates for character
 	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,

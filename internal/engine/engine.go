@@ -188,25 +188,36 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
+				e.Display.DrawSprite(x, y, 22, 12, display.MapANSIColor(world.Red)) // '22, 12' as a placeholder path pip
 				continue
 			}
 
-			// 2. Render the map tiles
+			// 2. Map TileType to a Sprite Coordinate
+			// Since we don't know the exact Kenney Sci-Fi sheet coordinates, we will use educated guesses.
+			// The user can easily change these later to point to the correct door, wall, and floor variations.
+			sheetX, sheetY := 0, 0
+			switch tile.Type {
+			case world.TileTypeWall:
+				sheetX, sheetY = 0, 1 // Assuming Row 1 Col 0 is a basic wall block
+			case world.TileTypeFloor:
+				sheetX, sheetY = 1, 0 // Assuming Row 0 Col 1 is a floor panel
+			case world.TileTypeEmpty:
+				sheetX, sheetY = 0, 0 // Empty transparent/black tile
+			}
+
 			if tile.Visible {
-				text, color := display.ExtractTextAndColor(theme[tile.Type])
-				e.Display.DrawText(x, y, text, color)
+				_, color := display.ExtractTextAndColor(theme[tile.Type])
+				e.Display.DrawSprite(x, y, sheetX, sheetY, color)
 				continue
 			}
 
 			if tile.Explored {
-				text, _ := display.ExtractTextAndColor(theme[tile.Type])
-				e.Display.DrawText(x, y, text, display.MapANSIColor(world.Gray))
+				e.Display.DrawSprite(x, y, sheetX, sheetY, display.MapANSIColor(world.Gray))
 				continue
 			}
 
-			text, color := display.ExtractTextAndColor(theme[world.TileTypeEmpty])
-			e.Display.DrawText(x, y, text, color)
+			// Unexplored/Empty Space
+			e.Display.DrawSprite(x, y, 0, 0, 0x000000FF)
 		}
 	}
 }

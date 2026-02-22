@@ -7,7 +7,7 @@ import (
 // The Component Names as constants to prevent typos
 const (
 	NamePosition      = "Position"
-	NameRenderable    = "Renderable"
+	NameSprite        = "Sprite"
 	NamePlayerControl = "PlayerControl"
 )
 
@@ -26,10 +26,13 @@ type Position struct {
 	Y int
 }
 
-// Renderable determines what an Entity looks like when drawn to the screen.
-type Renderable struct {
-	Char      string
-	ColorCode string // ANSI Color constant, e.g. "\x1b[31m" or world.Red
+// Sprite defines the graphical representation of an entity using a 2D Texture Atlas.
+// SheetX and SheetY represent the zero-indexed grid coordinates on the tileset image.
+// e.g., SheetX: 0, SheetY: 0 is the top-left tile on the PNG.
+type Sprite struct {
+	SheetX    int
+	SheetY    int
+	ColorCode string // To optionally colorize or tint the sprite
 }
 
 // PlayerControl indicates that this entity is currently controllable by the user.
