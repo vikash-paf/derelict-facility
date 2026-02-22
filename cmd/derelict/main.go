@@ -11,8 +11,8 @@ import (
 
 func main() {
 	width, height := 120, 26 // 120x30 -- reserving 4 rows for the HUD
-	tileSize := int32(16)    // From the handover doc
-	fontSize := int32(20)    // Optional: make font size slightly larger for readability
+	tileSize := int32(16)
+	fontSize := int32(20)
 
 	disp := display.NewRaylibDisplay(tileSize, fontSize)
 

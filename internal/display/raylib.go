@@ -22,7 +22,7 @@ func NewRaylibDisplay(tileSize, fontSize int32) *RaylibDisplay {
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 	rl.InitWindow(int32(gridWidth)*r.TileSize, int32(gridHeight)*r.TileSize, title)
-	rl.SetTargetFPS(60) // Changed to 60 as per handover doc
+	rl.SetTargetFPS(60)
 	return nil
 }
 
