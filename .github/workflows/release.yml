@@ -7,23 +7,30 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       matrix:
-        # We define our target matrix here
         include:
           - goos: linux
             goarch: amd64
             binary_name: derelict_linux
+            cc: x86_64-pc-linux-gnu-gcc
+            cxx: x86_64-pc-linux-gnu-g++
           - goos: windows
             goarch: amd64
             binary_name: derelict_win.exe
+            cc: x86_64-w64-mingw32-gcc
+            cxx: x86_64-w64-mingw32-g++
           - goos: darwin
             goarch: amd64
             binary_name: derelict_mac_intel
+            cc: clang
+            cxx: clang++
           - goos: darwin
             goarch: arm64
             binary_name: derelict_mac_apple
+            cc: clang
+            cxx: clang++
 
     steps:
       - name: Checkout Code
@@ -32,11 +39,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.0'
+          go-version: '1.24.0'
+
+      - name: Install Cross-Compilers (macOS)
+        run: |
+          brew install mingw-w64
+          brew install FiloSottile/musl-cross/musl-cross --without-x86_64 --without-aarch64   # For standard linux cross compilation, or using a specific tap.
+          # Actually, the best way to cross-compile Linux from Mac is using a tap that provides x86_64-linux-gnu-gcc
+          brew install messense/macos-cross-toolchains/x86_64-unknown-linux-gnu
 
       - name: Build Binary
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
           go build -v -ldflags="-s -w" \
           -o bin/${{ matrix.binary_name }} ./cmd/derelict
 
