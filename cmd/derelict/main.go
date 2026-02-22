@@ -10,13 +10,16 @@ import (
 )
 
 func main() {
-	width, height := 120, 26 // 120x30 -- reserving 4 rows for the HUD
-	tileSize := int32(16)
-	fontSize := int32(20)
+	mapWidth, mapHeight := 120, 26
+	windowWidth, windowHeight := 120, 30
 
-	disp := display.NewRaylibDisplay(tileSize, fontSize)
+	cellWidth := int32(12)
+	cellHeight := int32(24)
+	fontSize := int32(24)
 
-	err := disp.Init(width, height, "Derelict Facility")
+	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize)
+
+	err := disp.Init(windowWidth, windowHeight, "Derelict Facility")
 	if err != nil {
 		panic(err)
 	}
@@ -25,7 +28,7 @@ func main() {
 	// 2. Build the world and player FIRST
 	seed := time.Now().UnixNano()
 	generator := world.NewFacilityGenerator(uint64(seed))
-	generatedMap, playerX, playerY := generator.Generate(width, height)
+	generatedMap, playerX, playerY := generator.Generate(mapWidth, mapHeight)
 
 	player := world.NewPlayer(playerX, playerY, world.PlayerStatusHealthy, false)
 

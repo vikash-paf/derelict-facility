@@ -9,19 +9,21 @@ import (
 )
 
 type RaylibDisplay struct {
-	TileSize int32
-	FontSize int32
+	CellWidth  int32
+	CellHeight int32
+	FontSize   int32
 }
 
-func NewRaylibDisplay(tileSize, fontSize int32) *RaylibDisplay {
+func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32) *RaylibDisplay {
 	return &RaylibDisplay{
-		TileSize: tileSize,
-		FontSize: fontSize,
+		CellWidth:  cellWidth,
+		CellHeight: cellHeight,
+		FontSize:   fontSize,
 	}
 }
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
-	rl.InitWindow(int32(gridWidth)*r.TileSize, int32(gridHeight)*r.TileSize, title)
+	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
 	rl.SetTargetFPS(60)
 	return nil
 }
@@ -47,12 +49,19 @@ func (r *RaylibDisplay) Clear(colorHex uint32) {
 }
 
 func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
-	pixelX := int32(gridX) * r.TileSize
-	pixelY := int32(gridY) * r.TileSize
+	pixelY := int32(gridY) * r.CellHeight
 
-	// Adjust Y to perfectly align font within the tile if necessary.
-	// We'll just draw directly.
-	rl.DrawText(text, pixelX, pixelY, r.FontSize, rl.GetColor(uint(colorHex)))
+	colOffset := 0
+	for _, char := range text {
+		charStr := string(char)
+		charWidth := rl.MeasureText(charStr, r.FontSize)
+
+		// Center character horizontally in the cell
+		pixelX := int32(gridX+colOffset)*r.CellWidth + (r.CellWidth-charWidth)/2
+
+		rl.DrawText(charStr, pixelX, pixelY, r.FontSize, rl.GetColor(uint(colorHex)))
+		colOffset++
+	}
 }
 
 func (r *RaylibDisplay) PollInput() []core.InputEvent {
