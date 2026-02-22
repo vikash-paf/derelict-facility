@@ -242,7 +242,7 @@ func (e *Engine) render() {
 
 func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", world.Red)
-	e.drawTextCentered(16, "Press [P] to Resume", world.White)
+	e.drawTextCentered(16, "Press [ESC] to Resume", world.White)
 	e.drawTextCentered(17, "Press [Q] to Quit", world.Gray)
 }
 
