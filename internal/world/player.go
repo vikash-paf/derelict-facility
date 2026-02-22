@@ -1,5 +1,9 @@
 package world
 
+import (
+	"github.com/vikash-paf/derelict-facility/internal/entity"
+)
+
 type PlayerStatus int
 
 const (
@@ -13,12 +17,14 @@ const (
 )
 
 func NewPlayer(x, y int, status PlayerStatus) *Player {
-	return &Player{x, y, status}
+	return &Player{X: x, Y: y, Status: status}
 }
 
 type Player struct {
-	X, Y   int
-	Status PlayerStatus
+	X, Y        int
+	Status      PlayerStatus
+	Autopilot   bool
+	CurrentPath []entity.Point
 }
 
 func (p *Player) Render() string {
