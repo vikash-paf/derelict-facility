@@ -239,3 +239,14 @@ func (e *Engine) processAutopilot() {
 	// 3. Pop the step we just took off the slice
 	e.Player.CurrentPath = e.Player.CurrentPath[1:]
 }
+func (e *Engine) Pause() {
+	e.State = GameStatePaused
+}
+
+func (e *Engine) Resume() {
+	e.State = GameStateRunning
+}
+
+func (e *Engine) processSimulation() {
+	// todo: this is where all the frame logic exists
+}
