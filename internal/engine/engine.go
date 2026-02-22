@@ -1,15 +1,14 @@
 package engine
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/vikash-paf/derelict-facility/internal/core"
+	"github.com/vikash-paf/derelict-facility/internal/display"
 	"github.com/vikash-paf/derelict-facility/internal/entity"
-	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
@@ -27,11 +26,10 @@ const (
 )
 
 type Engine struct {
-	Terminal   *terminal.Terminal
+	Display    display.Display
 	Map        *world.Map
 	Player     *world.Player
 	Theme      world.TileVariant
-	screen     bytes.Buffer
 	TickerRate time.Duration
 	tickCount  int
 	State      GameState
@@ -39,13 +37,13 @@ type Engine struct {
 }
 
 func NewEngine(
-	term *terminal.Terminal,
+	disp display.Display,
 	gameMap *world.Map,
 	player *world.Player,
 	startingTheme world.TileVariant,
 ) *Engine {
 	e := &Engine{
-		Terminal:   term,
+		Display:    disp,
 		Map:        gameMap,
 		Player:     player,
 		State:      GameStateRunning,
@@ -54,37 +52,28 @@ func NewEngine(
 		Theme:      startingTheme,
 	}
 
-	// Calculate memory based on the map handed to us
-	memorySize := (gameMap.Width * gameMap.Height) + (gameMap.Height * 2) + 50
-	e.screen.Grow(memorySize)
-
 	return e
 }
 
 // Run starts the deterministic game loop
 func (e *Engine) Run() error {
-	inputChan := e.Terminal.PollInput()
-
-	ticker := time.NewTicker(e.TickerRate)
-	defer ticker.Stop()
-
-	for e.Running {
-		select {
-		case event := <-inputChan:
+	for !e.Display.ShouldClose() && e.Running {
+		events := e.Display.PollInput()
+		for _, event := range events {
 			e.handleInput(event)
-			e.render() // Paint the results!
-		case <-ticker.C:
-			if e.State == GameStateRunning {
-				e.Update() // Calculate all game rules!
-				e.render() // Paint the results!
-			}
 		}
+
+		if e.State == GameStateRunning {
+			e.Update() // Calculate all game rules!
+		}
+
+		e.render() // Paint the results!
 	}
 
 	return nil
 }
 
-func (e *Engine) handleInput(event terminal.InputEvent) {
+func (e *Engine) handleInput(event core.InputEvent) {
 	dx, dy := 0, 0
 
 	if event.Quit {
@@ -217,12 +206,12 @@ func (e *Engine) Resume() {
 }
 
 // render updates the game screen by drawing the map, GameState overlays,
-// and other visual elements to the Terminal buffer.
+// and other visual elements to the Display buffer.
 //
 // Renders top to bottom as separate layers.
 func (e *Engine) render() {
-	e.screen.Reset()
-	e.screen.WriteString(cursorHome)
+	e.Display.BeginFrame()
+	e.Display.Clear(0x000000FF) // Black background
 
 	renderTheme := e.Theme
 
@@ -239,7 +228,7 @@ func (e *Engine) render() {
 	default:
 	}
 
-	os.Stdout.Write(e.screen.Bytes())
+	e.Display.EndFrame()
 }
 
 func (e *Engine) renderPauseMenu() {
@@ -260,7 +249,8 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 		for x := 0; x < e.Map.Width; x++ {
 			// 1. Render the player
 			if e.Player.X == x && e.Player.Y == y {
-				e.screen.WriteString(e.Player.Render())
+				text, color := display.ExtractTextAndColor(e.Player.Render())
+				e.Display.DrawText(x, y, text, color)
 				continue
 			}
 
@@ -272,31 +262,25 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				// Use a dim character like a period or asterisk.
-				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
-				e.screen.WriteString(world.Red + "*" + world.Reset)
+				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
 				continue
 			}
 
 			// 2. Render the map tiles
 			if tile.Visible {
-				e.screen.WriteString(theme[tile.Type])
+				text, color := display.ExtractTextAndColor(theme[tile.Type])
+				e.Display.DrawText(x, y, text, color)
 				continue
 			}
 
 			if tile.Explored {
-				// We wrap the character in Gray and Reset to "dim" the lights
-				// Note: We use the character from Classic to keep the 'memory' simple
-				char := theme[tile.Type]
-				e.screen.WriteString(world.Gray + char + world.Reset)
+				text, _ := display.ExtractTextAndColor(theme[tile.Type])
+				e.Display.DrawText(x, y, text, display.MapANSIColor(world.Gray))
 				continue
 			}
 
-			e.screen.WriteString(theme[world.TileTypeEmpty])
-		}
-
-		if y < e.Map.Height-1 {
-			e.screen.WriteString(lineBreak)
+			text, color := display.ExtractTextAndColor(theme[world.TileTypeEmpty])
+			e.Display.DrawText(x, y, text, color)
 		}
 	}
 }
@@ -331,24 +315,20 @@ func (e *Engine) renderHUD() {
 	e.drawText(2, hudY+2, controls, world.Gray)
 }
 
-func (e *Engine) drawTextCentered(y int, text string, color string) {
+func (e *Engine) drawTextCentered(y int, text string, colorCode string) {
 	centerX := e.Map.Width / 2
 	halfText := len(text) / 2
 	x := centerX - halfText
 
-	moveCursor := e.Terminal.MoveCursorTo(x, y)
+	textStr, _ := display.ExtractTextAndColor(text)
+	colorHex := display.MapANSIColor(colorCode)
 
-	// Sequence: [Move Cursor] -> [Set Color] -> [Text] -> [Reset Color]
-	e.screen.WriteString(moveCursor)
-	e.screen.WriteString(color)
-	e.screen.WriteString(text)
-	e.screen.WriteString(world.Reset)
+	e.Display.DrawText(x, y, textStr, colorHex)
 }
 
-func (e *Engine) drawText(x, y int, text string, color string) {
-	moveCursor := e.Terminal.MoveCursorTo(x, y)
-	e.screen.WriteString(moveCursor)
-	e.screen.WriteString(color)
-	e.screen.WriteString(text)
-	e.screen.WriteString(world.Reset)
+func (e *Engine) drawText(x, y int, text string, colorCode string) {
+	textStr, _ := display.ExtractTextAndColor(text)
+	colorHex := display.MapANSIColor(colorCode)
+
+	e.Display.DrawText(x, y, textStr, colorHex)
 }
