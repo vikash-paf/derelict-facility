@@ -193,16 +193,20 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			// 2. Map TileType to a Sprite Coordinate
-			// Since we don't know the exact Kenney Sci-Fi sheet coordinates, we will use educated guesses.
-			// The user can easily change these later to point to the correct door, wall, and floor variations.
-			sheetX, sheetY := 0, 0
+			// The custom AI-generated 4x4 tilesheet layout:
+			// Row 0: Floors, Row 1: Walls, Row 2: Characters/Items, Row 3: Robots
+			sheetX, sheetY := -1, -1
 			switch tile.Type {
 			case world.TileTypeWall:
-				sheetX, sheetY = 0, 1 // Assuming Row 1 Col 0 is a basic wall block
+				sheetX, sheetY = 0, 1 // Row 1, Col 0
 			case world.TileTypeFloor:
-				sheetX, sheetY = 1, 0 // Assuming Row 0 Col 1 is a floor panel
+				sheetX, sheetY = 0, 0 // Row 0, Col 0
 			case world.TileTypeEmpty:
-				sheetX, sheetY = 0, 0 // Empty transparent/black tile
+				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
+			}
+
+			if sheetX == -1 {
+				continue // Skip rendering empty coordinates
 			}
 
 			if tile.Visible {
@@ -216,8 +220,8 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				continue
 			}
 
-			// Unexplored/Empty Space
-			e.Display.DrawSprite(x, y, 0, 0, 0x000000FF)
+			// Unexplored Space
+			// We don't draw anything here so the black background shows through
 		}
 	}
 }

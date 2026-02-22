@@ -38,7 +38,7 @@ func main() {
 
 	playerEnt := ecsWorld.CreateEntity()
 	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameSprite, &components.Sprite{SheetX: 25, SheetY: 0, ColorCode: world.Magenta}) // Placeholder coordinates for character
+	ecsWorld.AddComponent(playerEnt, components.NameSprite, &components.Sprite{SheetX: 2, SheetY: 2, ColorCode: world.White}) // Row 2, Col 2 contains the Engineer
 	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,

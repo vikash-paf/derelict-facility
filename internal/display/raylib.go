@@ -55,8 +55,8 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		r.Font = rl.GetFontDefault()
 	}
 
-	// Load the brand new beautiful Sci-Fi Graphics!
-	r.Tileset = rl.LoadTexture("assets/kenney_sci-fi-rts/Tilesheet/scifi_tilesheet.png")
+	// Load the specifically generated custom tileset
+	r.Tileset = rl.LoadTexture("assets/scifi_tileset.png")
 
 	return nil
 }
@@ -117,10 +117,10 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 	}
 }
 
-// DrawSprite cuts a 64x64 frame out of the Tileset atlas and draws it to the screen grid.
+// DrawSprite cuts a 160x160 frame out of the Tileset atlas and draws it to the screen grid.
 func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32) {
-	// The kenney sprites are 64x64 grids
-	spriteSize := float32(64)
+	// Our generated sprite has a 4x4 grid on a 640x640 image, so each cell is 160px.
+	spriteSize := float32(160)
 
 	// Where to cut the artwork on the giant sprite sheet
 	sourceRec := rl.NewRectangle(float32(sheetX)*spriteSize, float32(sheetY)*spriteSize, spriteSize, spriteSize)
