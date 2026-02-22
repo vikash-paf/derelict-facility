@@ -70,9 +70,12 @@ func (e *Engine) Run() error {
 		select {
 		case event := <-inputChan:
 			e.handleInput(event)
-		case <-ticker.C:
-			e.Update() // Calculate all game rules!
 			e.render() // Paint the results!
+		case <-ticker.C:
+			if e.State == GameStateRunning {
+				e.Update() // Calculate all game rules!
+				e.render() // Paint the results!
+			}
 		}
 	}
 
@@ -290,7 +293,9 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			e.screen.WriteString(theme[world.TileTypeEmpty])
 		}
 
-		e.screen.WriteString(lineBreak)
+		if y < e.Map.Height-1 {
+			e.screen.WriteString(lineBreak)
+		}
 	}
 }
 
