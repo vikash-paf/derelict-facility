@@ -94,16 +94,16 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	var events []core.InputEvent
 
-	if rl.IsKeyPressed(rl.KeyW) {
+	if rl.IsKeyPressed(rl.KeyW) || rl.IsKeyPressedRepeat(rl.KeyW) {
 		events = append(events, core.InputEvent{Key: 'w'})
 	}
-	if rl.IsKeyPressed(rl.KeyS) {
+	if rl.IsKeyPressed(rl.KeyS) || rl.IsKeyPressedRepeat(rl.KeyS) {
 		events = append(events, core.InputEvent{Key: 's'})
 	}
-	if rl.IsKeyPressed(rl.KeyA) {
+	if rl.IsKeyPressed(rl.KeyA) || rl.IsKeyPressedRepeat(rl.KeyA) {
 		events = append(events, core.InputEvent{Key: 'a'})
 	}
-	if rl.IsKeyPressed(rl.KeyD) {
+	if rl.IsKeyPressed(rl.KeyD) || rl.IsKeyPressedRepeat(rl.KeyD) {
 		events = append(events, core.InputEvent{Key: 'd'})
 	}
 	if rl.IsKeyPressed(rl.KeyP) {
