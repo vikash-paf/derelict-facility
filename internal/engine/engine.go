@@ -2,9 +2,11 @@ package engine
 
 import (
 	"bytes"
+	"math/rand"
 	"os"
 	"time"
 
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -22,6 +24,7 @@ type Engine struct {
 	Theme      world.TileVariant
 	screen     bytes.Buffer
 	TickerRate time.Duration
+	tickCount  int
 	Running    bool
 }
 
@@ -84,6 +87,9 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 		dx = -1
 	case 'd':
 		dx = 1
+	case 'p':
+		e.Player.Autopilot = !e.Player.Autopilot
+		e.Player.CurrentPath = nil // Clear the path if we toggle it
 	case 'q':
 		e.Running = false
 		return
@@ -115,6 +121,13 @@ func (e *Engine) render() {
 	e.screen.Reset()
 	e.screen.WriteString(cursorHome)
 
+	pathLookup := make(map[int]bool)
+	if e.Player.Autopilot {
+		for _, p := range e.Player.CurrentPath {
+			pathLookup[p.Y*e.Map.Width+p.X] = true
+		}
+	}
+
 	for y := 0; y < e.Map.Height; y++ {
 		for x := 0; x < e.Map.Width; x++ {
 			// 1. Render the player
@@ -123,12 +136,21 @@ func (e *Engine) render() {
 				continue
 			}
 
-			// 2. Render the map tiles
 			tile := e.Map.GetTile(x, y)
 			if tile == nil {
 				continue
 			}
+			isPathTile := pathLookup[y*e.Map.Width+x]
+			// We only draw the path if it's on a tile we've at least explored!
+			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
+			if isPathTile && (tile.Visible || tile.Explored) {
+				// Use a dim character like a period or asterisk.
+				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
+				e.screen.WriteString(world.Red + "*" + world.Reset)
+				continue
+			}
 
+			// 2. Render the map tiles
 			if tile.Visible {
 				e.screen.WriteString(e.Theme[tile.Type])
 				continue
@@ -153,6 +175,14 @@ func (e *Engine) render() {
 }
 
 func (e *Engine) Update() {
+	e.tickCount++
+
+	// Run AI movement every 2nd frame (approx 15 times a second)
+	if e.Player.Autopilot && e.tickCount%2 == 0 {
+		// run autopilot
+		e.processAutopilot()
+	}
+
 	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
 
 	// this is where I will add:
@@ -160,4 +190,44 @@ func (e *Engine) Update() {
 	// - Move enemies
 	// - Trigger story events
 	// - Update flashing light animations
+}
+
+func (e *Engine) processAutopilot() {
+	// 1. If we don't have a path, find a new destination!
+	if len(e.Player.CurrentPath) == 0 {
+		// Pick a random room
+		targetRoom := e.Map.Rooms[rand.Intn(len(e.Map.Rooms))]
+		targetX, targetY := targetRoom.Center()
+
+		start := entity.Point{X: e.Player.X, Y: e.Player.Y}
+		target := entity.Point{X: targetX, Y: targetY}
+
+		// Calculate the path
+		path := world.FindPath(e.Map, start, target)
+
+		// A* returns the starting node as index 0. We slice it off so we don't stand still.
+		if len(path) > 1 {
+			e.Player.CurrentPath = path[1:]
+		} else {
+			e.Player.CurrentPath = nil // We are already there, or trapped
+		}
+
+		return
+	}
+
+	// 2. Take the next step in the path
+	nextStep := e.Player.CurrentPath[0]
+
+	// Ensure the tile is still walkable (in case a door closed or enemy moved there)
+	if e.Map.IsWalkable(nextStep.X, nextStep.Y) {
+		e.Player.X = nextStep.X
+		e.Player.Y = nextStep.Y
+	} else {
+		// Path is blocked! Clear it so we recalculate next tick.
+		e.Player.CurrentPath = nil
+		return
+	}
+
+	// 3. Pop the step we just took off the slice
+	e.Player.CurrentPath = e.Player.CurrentPath[1:]
 }
