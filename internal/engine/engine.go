@@ -46,8 +46,8 @@ func NewEngine(
 		Terminal:   term,
 		Map:        gameMap,
 		Player:     player,
-		State:      GameStatePaused,
-		Running:    false,
+		State:      GameStateRunning,
+		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
 	}
@@ -102,6 +102,13 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 	case 'q':
 		e.Running = false
 		return
+	case 'x':
+		// handle the escape button to toggle the game state
+		if e.State == GameStateRunning {
+			e.State = GameStatePaused
+		} else {
+			e.State = GameStateRunning
+		}
 	}
 
 	if dx != 0 || dy != 0 {
@@ -191,19 +198,7 @@ func (e *Engine) Update() {
 		// do nothing, the world is frozen
 		// later: implement it to save the game
 	case GameStateRunning:
-		// Run AI movement every 2nd frame (approx 15 times a second)
-		if e.Player.Autopilot && e.tickCount%2 == 0 {
-			// run autopilot
-			e.processAutopilot()
-		}
-
-		e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
-
-		// this is where I will add:
-		// - Check if the player stepped on a checkpoint
-		// - Move enemies
-		// - Trigger story events
-		// - Update flashing light animations
+		e.processSimulation()
 	}
 }
 
@@ -247,14 +242,28 @@ func (e *Engine) processAutopilot() {
 	e.Player.CurrentPath = e.Player.CurrentPath[1:]
 }
 
+func (e *Engine) processSimulation() {
+	// todo: this is where all the frame logic exists
+
+	// Run AI movement every 2nd frame (approx 15 times a second)
+	if e.Player.Autopilot && e.tickCount%2 == 0 {
+		// run autopilot
+		e.processAutopilot()
+	}
+
+	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
+
+	// this is where I will add:
+	// - Check if the player stepped on a checkpoint
+	// - Move enemies
+	// - Trigger story events
+	// - Update flashing light animations
+}
+
 func (e *Engine) Pause() {
 	e.State = GameStatePaused
 }
 
 func (e *Engine) Resume() {
 	e.State = GameStateRunning
-}
-
-func (e *Engine) processSimulation() {
-	// todo: this is where all the frame logic exists
 }
