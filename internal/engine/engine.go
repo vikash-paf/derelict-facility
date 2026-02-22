@@ -229,15 +229,15 @@ func (e *Engine) render() {
 	if e.State == GameStatePaused {
 		renderTheme = world.TileVariantPaused
 	}
+
 	e.renderMapLayer(renderTheme)
+	e.renderHUD()
+
 	switch e.State {
 	case GameStatePaused:
 		e.renderPauseMenu()
-	case GameStateRunning:
-
+	default:
 	}
-
-	// e.renderHUD() // todo: implement HUD
 
 	os.Stdout.Write(e.screen.Bytes())
 }
@@ -320,7 +320,7 @@ func (e *Engine) renderHUD() {
 	if e.Player.Autopilot {
 		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", world.Red)
 	} else {
-		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]", world.Gray)
+		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", world.Gray)
 	}
 
 	// %06d formats the integer to always be 6 digits (e.g., 000142)
