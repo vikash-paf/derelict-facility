@@ -12,23 +12,47 @@ type RaylibDisplay struct {
 	CellWidth  int32
 	CellHeight int32
 	FontSize   int32
+	FontPath   string
+	Font       rl.Font
 }
 
-func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32) *RaylibDisplay {
+func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *RaylibDisplay {
 	return &RaylibDisplay{
 		CellWidth:  cellWidth,
 		CellHeight: cellHeight,
 		FontSize:   fontSize,
+		FontPath:   fontPath,
 	}
 }
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
 	rl.SetTargetFPS(60)
+	rl.SetExitKey(0) // Disable the default Escape key exit behavior
+
+	if r.FontPath != "" {
+		// Define the characters we want to load from the font
+		var fontChars []rune
+		for i := int32(32); i <= 126; i++ {
+			fontChars = append(fontChars, rune(i))
+		}
+		// Add some extended box drawing and roguelike characters
+		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼'}
+		fontChars = append(fontChars, extraChars...)
+
+		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
+		rl.SetTextureFilter(r.Font.Texture, rl.FilterBilinear)
+	} else {
+		r.Font = rl.GetFontDefault()
+	}
+
 	return nil
 }
 
 func (r *RaylibDisplay) Close() {
+	if r.FontPath != "" {
+		rl.UnloadFont(r.Font)
+	}
 	rl.CloseWindow()
 }
 
@@ -54,12 +78,15 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 	colOffset := 0
 	for _, char := range text {
 		charStr := string(char)
-		charWidth := rl.MeasureText(charStr, r.FontSize)
+
+		vecSize := rl.MeasureTextEx(r.Font, charStr, float32(r.FontSize), 0)
+		charWidth := int32(vecSize.X)
 
 		// Center character horizontally in the cell
 		pixelX := int32(gridX+colOffset)*r.CellWidth + (r.CellWidth-charWidth)/2
 
-		rl.DrawText(charStr, pixelX, pixelY, r.FontSize, rl.GetColor(uint(colorHex)))
+		position := rl.NewVector2(float32(pixelX), float32(pixelY))
+		rl.DrawTextEx(r.Font, charStr, position, float32(r.FontSize), 0, rl.GetColor(uint(colorHex)))
 		colOffset++
 	}
 }

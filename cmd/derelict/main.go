@@ -16,8 +16,9 @@ func main() {
 	cellWidth := int32(12)
 	cellHeight := int32(24)
 	fontSize := int32(24)
+	fontPath := "assets/fonts/FiraCode-Bold.ttf"
 
-	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize)
+	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize, fontPath)
 
 	err := disp.Init(windowWidth, windowHeight, "Derelict Facility")
 	if err != nil {
