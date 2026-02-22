@@ -161,8 +161,8 @@ func (e *Engine) render() {
 func (e *Engine) Update() {
 	e.tickCount++
 
-	// Run AI movement every 6th frame (approx 5 times a second)
-	if e.Player.Autopilot && e.tickCount%6 == 0 {
+	// Run AI movement every 2nd frame (approx 15 times a second)
+	if e.Player.Autopilot && e.tickCount%2 == 0 {
 		// run autopilot
 		e.processAutopilot()
 	}
