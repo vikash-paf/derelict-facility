@@ -22,6 +22,7 @@ type Engine struct {
 	Theme      world.TileVariant
 	screen     bytes.Buffer
 	TickerRate time.Duration
+	tickCount  int
 	Running    bool
 }
 
@@ -84,6 +85,9 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 		dx = -1
 	case 'd':
 		dx = 1
+	case 'p':
+		e.Player.Autopilot = !e.Player.Autopilot
+		e.Player.CurrentPath = nil // Clear the path if we toggle it
 	case 'q':
 		e.Running = false
 		return
@@ -153,6 +157,13 @@ func (e *Engine) render() {
 }
 
 func (e *Engine) Update() {
+	e.tickCount++
+
+	// Run AI movement every 6th frame (approx 5 times a second)
+	if e.Player.Autopilot && e.tickCount%6 == 0 {
+		// run autopilot
+	}
+
 	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
 
 	// this is where I will add:
