@@ -17,6 +17,12 @@ const (
 	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
 )
 
+type GameState uint8
+
+const (
+	GameStatePaused GameState = iota
+	GameStateRunning
+)
 type Engine struct {
 	Terminal   *terminal.Terminal
 	Map        *world.Map
@@ -25,6 +31,7 @@ type Engine struct {
 	screen     bytes.Buffer
 	TickerRate time.Duration
 	tickCount  int
+	State      GameState
 	Running    bool
 }
 
@@ -38,7 +45,8 @@ func NewEngine(
 		Terminal:   term,
 		Map:        gameMap,
 		Player:     player,
-		Running:    true,
+		State:      GameStatePaused,
+		Running:    false,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
 	}
