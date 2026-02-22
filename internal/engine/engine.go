@@ -193,14 +193,13 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			// 2. Map TileType to a Sprite Coordinate
-			// The custom AI-generated 4x4 tilesheet layout:
-			// Row 0: Floors, Row 1: Walls, Row 2: Characters/Items, Row 3: Robots
+			// Using Kenney Sci-Fi sheet coordinates:
 			sheetX, sheetY := -1, -1
 			switch tile.Type {
 			case world.TileTypeWall:
-				sheetX, sheetY = 0, 1 // Row 1, Col 0
+				sheetX, sheetY = 0, 1 // Assuming Row 1 Col 0 is a basic wall block
 			case world.TileTypeFloor:
-				sheetX, sheetY = 0, 0 // Row 0, Col 0
+				sheetX, sheetY = 1, 0 // Assuming Row 0 Col 1 is a floor panel
 			case world.TileTypeEmpty:
 				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
 			}
