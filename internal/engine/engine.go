@@ -312,3 +312,11 @@ func (e *Engine) drawTextCentered(y int, text string, color string) {
 	e.screen.WriteString(text)
 	e.screen.WriteString(world.Reset)
 }
+
+func (e *Engine) drawText(x, y int, text string, color string) {
+	moveCursor := e.Terminal.MoveCursorTo(x, y)
+	e.screen.WriteString(moveCursor)
+	e.screen.WriteString(color)
+	e.screen.WriteString(text)
+	e.screen.WriteString(world.Reset)
+}
