@@ -38,7 +38,7 @@ func main() {
 
 	playerEnt := ecsWorld.CreateEntity()
 	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "@", ColorCode: world.Green})
+	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "", ColorCode: world.Magenta})
 	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,

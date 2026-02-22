@@ -37,7 +37,7 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 			fontChars = append(fontChars, rune(i))
 		}
 		// Add some extended box drawing and roguelike characters, plus the power cell icon
-		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡'}
+		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', ''}
 		fontChars = append(fontChars, extraChars...)
 
 		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
