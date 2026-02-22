@@ -195,7 +195,7 @@ func (e *Engine) processAutopilot() {
 		} else {
 			e.Player.CurrentPath = nil // We are already there, or trapped
 		}
-		
+
 		return
 	}
 

@@ -13,7 +13,7 @@ const (
 )
 
 const (
-	playerCharacter = "🚶"
+	playerCharacter = "@"
 )
 
 func NewPlayer(x, y int, status PlayerStatus) *Player {
