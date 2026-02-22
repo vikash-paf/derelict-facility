@@ -9,11 +9,12 @@ import (
 )
 
 type RaylibDisplay struct {
-	CellWidth  int32
-	CellHeight int32
-	FontSize   int32
-	FontPath   string
-	Font       rl.Font
+	CellWidth    int32
+	CellHeight   int32
+	FontSize     int32
+	FontPath     string
+	Font         rl.Font
+	FallbackFont rl.Font
 }
 
 func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *RaylibDisplay {
@@ -37,11 +38,19 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 			fontChars = append(fontChars, rune(i))
 		}
 		// Add some extended box drawing and roguelike characters, plus the power cell icon
-		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', ''}
+		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', '', '👷'}
 		fontChars = append(fontChars, extraChars...)
 
 		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
 		rl.SetTextureFilter(r.Font.Texture, rl.FilterBilinear)
+
+		// Load the Noto Emoji font for fallback
+		fallbackPath := "assets/fonts/NotoEmoji-Regular.ttf"
+		// Raylib doesn't have a direct SetFontFallback in its current Go bindings,
+		// but we can manage drawing fallbacks ourselves if needed, or rely on OS defaults.
+		// Wait, rl-go does have it:
+		r.FallbackFont = rl.LoadFontEx(fallbackPath, r.FontSize, fontChars)
+		// We'll manually handle the fallback in DrawText if rl doesn't.
 	} else {
 		r.Font = rl.GetFontDefault()
 	}
@@ -52,6 +61,9 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 func (r *RaylibDisplay) Close() {
 	if r.FontPath != "" {
 		rl.UnloadFont(r.Font)
+		if r.FallbackFont.Texture.ID != 0 {
+			rl.UnloadFont(r.FallbackFont)
+		}
 	}
 	rl.CloseWindow()
 }
@@ -84,9 +96,17 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 
 		// Center character horizontally in the cell
 		pixelX := int32(gridX+colOffset)*r.CellWidth + (r.CellWidth-charWidth)/2
-
 		position := rl.NewVector2(float32(pixelX), float32(pixelY))
-		rl.DrawTextEx(r.Font, charStr, position, float32(r.FontSize), 0, rl.GetColor(uint(colorHex)))
+
+		// If the main font didn't load a glyph for this character, it returns an index of 0 (the '?')
+		// We can check rl.GetGlyphIndex(r.Font, char) to see if it exists.
+		glyphIndex := rl.GetGlyphIndex(r.Font, char)
+		if glyphIndex == 0 && r.FallbackFont.Texture.ID != 0 && rl.GetGlyphIndex(r.FallbackFont, char) != 0 {
+			rl.DrawTextEx(r.FallbackFont, charStr, position, float32(r.FontSize), 0, rl.GetColor(uint(colorHex)))
+		} else {
+			rl.DrawTextEx(r.Font, charStr, position, float32(r.FontSize), 0, rl.GetColor(uint(colorHex)))
+		}
+
 		colOffset++
 	}
 }
