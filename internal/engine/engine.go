@@ -267,3 +267,27 @@ func (e *Engine) Pause() {
 func (e *Engine) Resume() {
 	e.State = GameStateRunning
 }
+
+func (e *Engine) renderPauseMenu() {
+	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", world.Red)
+	e.drawTextCentered(16, "Press [P] to Resume", world.White)
+	e.drawTextCentered(17, "Press [Q] to Quit", world.Gray)
+}
+
+func (e *Engine) renderMapLayer() {
+	// todo: move code from render() to here and change render to use the game state to show the game or the menu
+}
+
+func (e *Engine) drawTextCentered(y int, text string, color string) {
+	centerX := e.Map.Width / 2
+	halfText := len(text) / 2
+	x := centerX - halfText
+
+	moveCursor := e.Terminal.MoveCursorTo(x, y)
+
+	// Sequence: [Move Cursor] -> [Set Color] -> [Text] -> [Reset Color]
+	e.screen.WriteString(moveCursor)
+	e.screen.WriteString(color)
+	e.screen.WriteString(text)
+	e.screen.WriteString(world.Reset)
+}
