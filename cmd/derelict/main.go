@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	width, height := 120, 30
+	width, height := 120, 26 // 120x30 -- reserving 4 rows for the HUD
 
 	term := terminal.NewTerminal()
 	err := term.EnableRawMode()

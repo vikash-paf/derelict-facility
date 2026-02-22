@@ -2,8 +2,10 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/entity"
@@ -17,6 +19,13 @@ const (
 	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
 )
 
+type GameState uint8
+
+const (
+	GameStatePaused GameState = iota
+	GameStateRunning
+)
+
 type Engine struct {
 	Terminal   *terminal.Terminal
 	Map        *world.Map
@@ -25,6 +34,7 @@ type Engine struct {
 	screen     bytes.Buffer
 	TickerRate time.Duration
 	tickCount  int
+	State      GameState
 	Running    bool
 }
 
@@ -38,6 +48,7 @@ func NewEngine(
 		Terminal:   term,
 		Map:        gameMap,
 		Player:     player,
+		State:      GameStateRunning,
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
@@ -61,9 +72,12 @@ func (e *Engine) Run() error {
 		select {
 		case event := <-inputChan:
 			e.handleInput(event)
-		case <-ticker.C:
-			e.Update() // Calculate all game rules!
 			e.render() // Paint the results!
+		case <-ticker.C:
+			if e.State == GameStateRunning {
+				e.Update() // Calculate all game rules!
+				e.render() // Paint the results!
+			}
 		}
 	}
 
@@ -93,9 +107,16 @@ func (e *Engine) handleInput(event terminal.InputEvent) {
 	case 'q':
 		e.Running = false
 		return
+	case 27:
+		// handle the escape button to toggle the game state
+		if e.State == GameStateRunning {
+			e.State = GameStatePaused
+		} else {
+			e.State = GameStateRunning
+		}
 	}
 
-	if dx != 0 || dy != 0 {
+	if e.State == GameStateRunning && dx != 0 || dy != 0 {
 		e.movePlayer(dx, dy)
 	}
 }
@@ -117,79 +138,16 @@ func (e *Engine) movePlayer(dx, dy int) {
 	}
 }
 
-func (e *Engine) render() {
-	e.screen.Reset()
-	e.screen.WriteString(cursorHome)
-
-	pathLookup := make(map[int]bool)
-	if e.Player.Autopilot {
-		for _, p := range e.Player.CurrentPath {
-			pathLookup[p.Y*e.Map.Width+p.X] = true
-		}
-	}
-
-	for y := 0; y < e.Map.Height; y++ {
-		for x := 0; x < e.Map.Width; x++ {
-			// 1. Render the player
-			if e.Player.X == x && e.Player.Y == y {
-				e.screen.WriteString(e.Player.Render())
-				continue
-			}
-
-			tile := e.Map.GetTile(x, y)
-			if tile == nil {
-				continue
-			}
-			isPathTile := pathLookup[y*e.Map.Width+x]
-			// We only draw the path if it's on a tile we've at least explored!
-			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
-			if isPathTile && (tile.Visible || tile.Explored) {
-				// Use a dim character like a period or asterisk.
-				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
-				e.screen.WriteString(world.Red + "*" + world.Reset)
-				continue
-			}
-
-			// 2. Render the map tiles
-			if tile.Visible {
-				e.screen.WriteString(e.Theme[tile.Type])
-				continue
-			}
-
-			if tile.Explored {
-				// We wrap the character in Gray and Reset to "dim" the lights
-				// Note: We use the character from Classic to keep the 'memory' simple
-				char := e.Theme[tile.Type]
-				e.screen.WriteString(world.Gray + char + world.Reset)
-				continue
-			}
-
-			e.screen.WriteString(e.Theme[world.TileTypeEmpty])
-		}
-
-		e.screen.WriteString(lineBreak)
-	}
-
-	// Render the screen
-	os.Stdout.Write(e.screen.Bytes())
-}
-
 func (e *Engine) Update() {
 	e.tickCount++
 
-	// Run AI movement every 2nd frame (approx 15 times a second)
-	if e.Player.Autopilot && e.tickCount%2 == 0 {
-		// run autopilot
-		e.processAutopilot()
+	switch e.State {
+	case GameStatePaused:
+		// do nothing, the world is frozen
+		// later: implement it to save the game
+	case GameStateRunning:
+		e.processSimulation()
 	}
-
-	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
-
-	// this is where I will add:
-	// - Check if the player stepped on a checkpoint
-	// - Move enemies
-	// - Trigger story events
-	// - Update flashing light animations
 }
 
 func (e *Engine) processAutopilot() {
@@ -230,4 +188,167 @@ func (e *Engine) processAutopilot() {
 
 	// 3. Pop the step we just took off the slice
 	e.Player.CurrentPath = e.Player.CurrentPath[1:]
+}
+
+func (e *Engine) processSimulation() {
+	// todo: this is where all the frame logic exists
+
+	// Run AI movement every 2nd frame (approx 15 times a second)
+	if e.Player.Autopilot && e.tickCount%2 == 0 {
+		// run autopilot
+		e.processAutopilot()
+	}
+
+	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
+
+	// this is where I will add:
+	// - Check if the player stepped on a checkpoint
+	// - Move enemies
+	// - Trigger story events
+	// - Update flashing light animations
+}
+
+func (e *Engine) Pause() {
+	e.State = GameStatePaused
+}
+
+func (e *Engine) Resume() {
+	e.State = GameStateRunning
+}
+
+// render updates the game screen by drawing the map, GameState overlays,
+// and other visual elements to the Terminal buffer.
+//
+// Renders top to bottom as separate layers.
+func (e *Engine) render() {
+	e.screen.Reset()
+	e.screen.WriteString(cursorHome)
+
+	renderTheme := e.Theme
+
+	if e.State == GameStatePaused {
+		renderTheme = world.TileVariantPaused
+	}
+
+	e.renderMapLayer(renderTheme)
+	e.renderHUD()
+
+	switch e.State {
+	case GameStatePaused:
+		e.renderPauseMenu()
+	default:
+	}
+
+	os.Stdout.Write(e.screen.Bytes())
+}
+
+func (e *Engine) renderPauseMenu() {
+	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", world.Red)
+	e.drawTextCentered(16, "Press [ESC] to Resume", world.White)
+	e.drawTextCentered(17, "Press [Q] to Quit", world.Gray)
+}
+
+func (e *Engine) renderMapLayer(theme world.TileVariant) {
+	pathLookup := make(map[int]bool)
+	if e.Player.Autopilot {
+		for _, p := range e.Player.CurrentPath {
+			pathLookup[p.Y*e.Map.Width+p.X] = true
+		}
+	}
+
+	for y := 0; y < e.Map.Height; y++ {
+		for x := 0; x < e.Map.Width; x++ {
+			// 1. Render the player
+			if e.Player.X == x && e.Player.Y == y {
+				e.screen.WriteString(e.Player.Render())
+				continue
+			}
+
+			tile := e.Map.GetTile(x, y)
+			if tile == nil {
+				continue
+			}
+			isPathTile := pathLookup[y*e.Map.Width+x]
+			// We only draw the path if it's on a tile we've at least explored!
+			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
+			if isPathTile && (tile.Visible || tile.Explored) {
+				// Use a dim character like a period or asterisk.
+				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
+				e.screen.WriteString(world.Red + "*" + world.Reset)
+				continue
+			}
+
+			// 2. Render the map tiles
+			if tile.Visible {
+				e.screen.WriteString(theme[tile.Type])
+				continue
+			}
+
+			if tile.Explored {
+				// We wrap the character in Gray and Reset to "dim" the lights
+				// Note: We use the character from Classic to keep the 'memory' simple
+				char := theme[tile.Type]
+				e.screen.WriteString(world.Gray + char + world.Reset)
+				continue
+			}
+
+			e.screen.WriteString(theme[world.TileTypeEmpty])
+		}
+
+		if y < e.Map.Height-1 {
+			e.screen.WriteString(lineBreak)
+		}
+	}
+}
+
+func (e *Engine) renderHUD() {
+	// The Y-coordinate where the map ends and the HUD begins
+	hudY := e.Map.Height
+
+	// strings.Repeat is a highly optimized Go standard library function
+	divider := strings.Repeat("═", e.Map.Width)
+	e.drawText(0, hudY, divider, world.Gray)
+
+	statusText := "HEALTHY"
+	if e.Player.Status == world.PlayerStatusSick {
+		statusText = "SICK / TOXIC"
+	} else if e.Player.Status == world.PlayerStatusHurt {
+		statusText = "CRITICAL"
+	}
+	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), world.Cyan)
+
+	if e.Player.Autopilot {
+		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", world.Red)
+	} else {
+		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", world.Gray)
+	}
+
+	// %06d formats the integer to always be 6 digits (e.g., 000142)
+	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
+	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, world.White)
+
+	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
+	e.drawText(2, hudY+2, controls, world.Gray)
+}
+
+func (e *Engine) drawTextCentered(y int, text string, color string) {
+	centerX := e.Map.Width / 2
+	halfText := len(text) / 2
+	x := centerX - halfText
+
+	moveCursor := e.Terminal.MoveCursorTo(x, y)
+
+	// Sequence: [Move Cursor] -> [Set Color] -> [Text] -> [Reset Color]
+	e.screen.WriteString(moveCursor)
+	e.screen.WriteString(color)
+	e.screen.WriteString(text)
+	e.screen.WriteString(world.Reset)
+}
+
+func (e *Engine) drawText(x, y int, text string, color string) {
+	moveCursor := e.Terminal.MoveCursorTo(x, y)
+	e.screen.WriteString(moveCursor)
+	e.screen.WriteString(color)
+	e.screen.WriteString(text)
+	e.screen.WriteString(world.Reset)
 }
