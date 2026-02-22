@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/terminal"
 	"github.com/vikash-paf/derelict-facility/internal/world"
@@ -84,7 +85,7 @@ func (e *Engine) Run() error {
 	return nil
 }
 
-func (e *Engine) handleInput(event terminal.InputEvent) {
+func (e *Engine) handleInput(event core.InputEvent) {
 	dx, dy := 0, 0
 
 	if event.Quit {

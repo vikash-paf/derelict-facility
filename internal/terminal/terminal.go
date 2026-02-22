@@ -4,17 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/vikash-paf/derelict-facility/internal/core"
 	"golang.org/x/term"
 )
 
 const hideCursor = "\033[?25l"
 const showCursor = "\033[?25h"
 const clearScreen = "\033[2J\033[H"
-
-type InputEvent struct {
-	Key  rune
-	Quit bool // Tells the main game loop "Hey, they pressed Ctrl+C!"
-}
 
 func NewTerminal() *Terminal {
 	return &Terminal{}
@@ -69,8 +65,8 @@ func (t *Terminal) MoveCursorTo(x, y int) string {
 	return fmt.Sprintf("\033[%d;%dH", y+1, x+1)
 }
 
-func (t *Terminal) PollInput() <-chan InputEvent {
-	events := make(chan InputEvent, 10)
+func (t *Terminal) PollInput() <-chan core.InputEvent {
+	events := make(chan core.InputEvent, 10)
 
 	go func() {
 		for {
@@ -84,11 +80,11 @@ func (t *Terminal) PollInput() <-chan InputEvent {
 
 			// Catch Ctrl+C (ASCII value 3) or ESC (ASCII value 27)
 			if b[0] == 3 {
-				events <- InputEvent{Quit: true}
+				events <- core.InputEvent{Quit: true}
 				continue
 			}
 
-			events <- InputEvent{Key: rune(b[0])}
+			events <- core.InputEvent{Key: rune(b[0])}
 		}
 	}()
 
