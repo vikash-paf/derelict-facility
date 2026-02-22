@@ -144,7 +144,7 @@ func (e *Engine) render() {
 	}
 
 	e.renderMapLayer(renderTheme)
-	systems.RenderEntities(e.EcsWorld, e.Display)
+	systems.RenderEntities(e.EcsWorld, e.Display, e.Map)
 	e.renderHUD()
 
 	switch e.State {
