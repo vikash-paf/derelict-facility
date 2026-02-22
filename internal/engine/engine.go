@@ -2,13 +2,14 @@ package engine
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
-	"github.com/vikash-paf/derelict-facility/internal/entity"
+	"github.com/vikash-paf/derelict-facility/internal/ecs"
+	"github.com/vikash-paf/derelict-facility/internal/systems"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
@@ -28,7 +29,7 @@ const (
 type Engine struct {
 	Display    display.Display
 	Map        *world.Map
-	Player     *world.Player
+	EcsWorld   *ecs.World // Replaces Player
 	Theme      world.TileVariant
 	TickerRate time.Duration
 	tickCount  int
@@ -39,13 +40,13 @@ type Engine struct {
 func NewEngine(
 	disp display.Display,
 	gameMap *world.Map,
-	player *world.Player,
+	ecsWorld *ecs.World,
 	startingTheme world.TileVariant,
 ) *Engine {
 	e := &Engine{
 		Display:    disp,
 		Map:        gameMap,
-		Player:     player,
+		EcsWorld:   ecsWorld,
 		State:      GameStateRunning,
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
@@ -74,29 +75,17 @@ func (e *Engine) Run() error {
 }
 
 func (e *Engine) handleInput(event core.InputEvent) {
-	dx, dy := 0, 0
-
 	if event.Quit {
 		e.Running = false
 		return
 	}
 
-	switch event.Key {
-	case 'w':
-		dy = -1
-	case 's':
-		dy = 1
-	case 'a':
-		dx = -1
-	case 'd':
-		dx = 1
-	case 'p':
-		e.Player.Autopilot = !e.Player.Autopilot
-		e.Player.CurrentPath = nil // Clear the path if we toggle it
-	case 'q':
+	if event.Key == 'q' {
 		e.Running = false
 		return
-	case 27:
+	}
+
+	if event.Key == 27 {
 		// handle the escape button to toggle the game state
 		if e.State == GameStateRunning {
 			e.State = GameStatePaused
@@ -105,25 +94,9 @@ func (e *Engine) handleInput(event core.InputEvent) {
 		}
 	}
 
-	if e.State == GameStateRunning && dx != 0 || dy != 0 {
-		e.movePlayer(dx, dy)
-	}
-}
-
-func (e *Engine) movePlayer(dx, dy int) {
-	newX := e.Player.X + dx
-	newY := e.Player.Y + dy
-
-	// if outside the map, do nothing
-	if newX < 0 || newX >= e.Map.Width || newY < 0 || newY >= e.Map.Height {
-		return
-	}
-
-	// check if the tile is walkable
-	tile := e.Map.GetTile(newX, newY)
-	if tile != nil && tile.Walkable {
-		e.Player.X = newX
-		e.Player.Y = newY
+	// We ONLY pass input to systems if the game is running
+	if e.State == GameStateRunning {
+		// e.processSimulation() handles processing these events via ECS systems instead
 	}
 }
 
@@ -140,61 +113,51 @@ func (e *Engine) Update() {
 }
 
 func (e *Engine) processAutopilot() {
-	// 1. If we don't have a path, find a new destination!
-	if len(e.Player.CurrentPath) == 0 {
-		// Pick a random room
-		targetRoom := e.Map.Rooms[rand.Intn(len(e.Map.Rooms))]
-		targetX, targetY := targetRoom.Center()
-
-		start := entity.Point{X: e.Player.X, Y: e.Player.Y}
-		target := entity.Point{X: targetX, Y: targetY}
-
-		// Calculate the path
-		path := world.FindPath(e.Map, start, target)
-
-		// A* returns the starting node as index 0. We slice it off so we don't stand still.
-		if len(path) > 1 {
-			e.Player.CurrentPath = path[1:]
-		} else {
-			e.Player.CurrentPath = nil // We are already there, or trapped
-		}
-
-		return
-	}
-
-	// 2. Take the next step in the path
-	nextStep := e.Player.CurrentPath[0]
-
-	// Ensure the tile is still walkable (in case a door closed or enemy moved there)
-	if e.Map.IsWalkable(nextStep.X, nextStep.Y) {
-		e.Player.X = nextStep.X
-		e.Player.Y = nextStep.Y
-	} else {
-		// Path is blocked! Clear it so we recalculate next tick.
-		e.Player.CurrentPath = nil
-		return
-	}
-
-	// 3. Pop the step we just took off the slice
-	e.Player.CurrentPath = e.Player.CurrentPath[1:]
+	// Replaced by systems.ProcessAutopilot
 }
 
 func (e *Engine) processSimulation() {
-	// todo: this is where all the frame logic exists
+	// Let the systems tick!
+
+	// The Input system handles the raw events we polled
+	// However, we process input directly inside handleInput to remain frame-accurate,
+	// so for now we'll fetch input polling from display here instead of previously
+	events := e.Display.PollInput()
+	e.handleInputForGlobals(events) // Filter out Q and ESC
+
+	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map)
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
-	if e.Player.Autopilot && e.tickCount%2 == 0 {
-		// run autopilot
-		e.processAutopilot()
+	if e.tickCount%2 == 0 {
+		systems.ProcessAutopilot(e.EcsWorld, e.Map)
 	}
 
-	e.Map.ComputeFOV(e.Player.X, e.Player.Y, fovRadius)
+	// Calculate FOV (We need to find the player's position first in an ECS)
+	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
+	if len(playerEntities) > 0 {
+		if posRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePosition); posRaw != nil {
+			pos := posRaw.(*components.Position)
+			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius)
+		}
+	}
+}
 
-	// this is where I will add:
-	// - Check if the player stepped on a checkpoint
-	// - Move enemies
-	// - Trigger story events
-	// - Update flashing light animations
+// handleInputForGlobals processes ESC and Q to quit/pause the game,
+// bypassing the ECS Input System which only handles movement.
+func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
+	for _, event := range events {
+		if event.Quit || event.Key == 'q' {
+			e.Running = false
+			return
+		}
+		if event.Key == 27 { // Escape
+			if e.State == GameStateRunning {
+				e.State = GameStatePaused
+			} else {
+				e.State = GameStateRunning
+			}
+		}
+	}
 }
 
 func (e *Engine) Pause() {
@@ -220,6 +183,7 @@ func (e *Engine) render() {
 	}
 
 	e.renderMapLayer(renderTheme)
+	systems.RenderEntities(e.EcsWorld, e.Display)
 	e.renderHUD()
 
 	switch e.State {
@@ -239,21 +203,22 @@ func (e *Engine) renderPauseMenu() {
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	pathLookup := make(map[int]bool)
-	if e.Player.Autopilot {
-		for _, p := range e.Player.CurrentPath {
-			pathLookup[p.Y*e.Map.Width+p.X] = true
+
+	// Collect paths from all PlayerControl entities to draw the red autopilot line
+	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
+	for _, ent := range playerEntities {
+		if ctrlRaw := e.EcsWorld.GetComponent(ent, components.NamePlayerControl); ctrlRaw != nil {
+			ctrl := ctrlRaw.(*components.PlayerControl)
+			if ctrl.Autopilot {
+				for _, p := range ctrl.CurrentPath {
+					pathLookup[p.Y*e.Map.Width+p.X] = true
+				}
+			}
 		}
 	}
 
 	for y := 0; y < e.Map.Height; y++ {
 		for x := 0; x < e.Map.Width; x++ {
-			// 1. Render the player
-			if e.Player.X == x && e.Player.Y == y {
-				text, color := display.ExtractTextAndColor(e.Player.Render())
-				e.Display.DrawText(x, y, text, color)
-				continue
-			}
-
 			tile := e.Map.GetTile(x, y)
 			if tile == nil {
 				continue
@@ -294,14 +259,25 @@ func (e *Engine) renderHUD() {
 	e.drawText(0, hudY, divider, world.Gray)
 
 	statusText := "HEALTHY"
-	if e.Player.Status == world.PlayerStatusSick {
-		statusText = "SICK / TOXIC"
-	} else if e.Player.Status == world.PlayerStatusHurt {
-		statusText = "CRITICAL"
+	autopilotEngaged := false
+
+	// Find player state for HUD
+	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
+	if len(playerEntities) > 0 {
+		if ctrlRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePlayerControl); ctrlRaw != nil {
+			ctrl := ctrlRaw.(*components.PlayerControl)
+			autopilotEngaged = ctrl.Autopilot
+			if ctrl.Status == world.PlayerStatusSick {
+				statusText = "SICK / TOXIC"
+			} else if ctrl.Status == world.PlayerStatusHurt {
+				statusText = "CRITICAL"
+			}
+		}
 	}
+
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), world.Cyan)
 
-	if e.Player.Autopilot {
+	if autopilotEngaged {
 		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", world.Red)
 	} else {
 		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", world.Gray)
