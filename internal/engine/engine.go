@@ -133,63 +133,6 @@ func (e *Engine) movePlayer(dx, dy int) {
 	}
 }
 
-func (e *Engine) render() {
-	e.screen.Reset()
-	e.screen.WriteString(cursorHome)
-
-	pathLookup := make(map[int]bool)
-	if e.Player.Autopilot {
-		for _, p := range e.Player.CurrentPath {
-			pathLookup[p.Y*e.Map.Width+p.X] = true
-		}
-	}
-
-	for y := 0; y < e.Map.Height; y++ {
-		for x := 0; x < e.Map.Width; x++ {
-			// 1. Render the player
-			if e.Player.X == x && e.Player.Y == y {
-				e.screen.WriteString(e.Player.Render())
-				continue
-			}
-
-			tile := e.Map.GetTile(x, y)
-			if tile == nil {
-				continue
-			}
-			isPathTile := pathLookup[y*e.Map.Width+x]
-			// We only draw the path if it's on a tile we've at least explored!
-			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
-			if isPathTile && (tile.Visible || tile.Explored) {
-				// Use a dim character like a period or asterisk.
-				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
-				e.screen.WriteString(world.Red + "*" + world.Reset)
-				continue
-			}
-
-			// 2. Render the map tiles
-			if tile.Visible {
-				e.screen.WriteString(e.Theme[tile.Type])
-				continue
-			}
-
-			if tile.Explored {
-				// We wrap the character in Gray and Reset to "dim" the lights
-				// Note: We use the character from Classic to keep the 'memory' simple
-				char := e.Theme[tile.Type]
-				e.screen.WriteString(world.Gray + char + world.Reset)
-				continue
-			}
-
-			e.screen.WriteString(e.Theme[world.TileTypeEmpty])
-		}
-
-		e.screen.WriteString(lineBreak)
-	}
-
-	// Render the screen
-	os.Stdout.Write(e.screen.Bytes())
-}
-
 func (e *Engine) Update() {
 	e.tickCount++
 
@@ -268,6 +211,28 @@ func (e *Engine) Resume() {
 	e.State = GameStateRunning
 }
 
+// render updates the game screen by drawing the map, GameState overlays,
+// and other visual elements to the Terminal buffer.
+//
+// Renders top to bottom as separate layers.
+func (e *Engine) render() {
+	e.screen.Reset()
+	e.screen.WriteString(cursorHome)
+
+	e.renderMapLayer()
+
+	switch e.State {
+	case GameStatePaused:
+		e.renderPauseMenu()
+	case GameStateRunning:
+		// do nothing because the map is rendered above
+	}
+
+	// e.renderHUD() // todo: implement HUD
+
+	os.Stdout.Write(e.screen.Bytes())
+}
+
 func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", world.Red)
 	e.drawTextCentered(16, "Press [P] to Resume", world.White)
@@ -275,7 +240,54 @@ func (e *Engine) renderPauseMenu() {
 }
 
 func (e *Engine) renderMapLayer() {
-	// todo: move code from render() to here and change render to use the game state to show the game or the menu
+	pathLookup := make(map[int]bool)
+	if e.Player.Autopilot {
+		for _, p := range e.Player.CurrentPath {
+			pathLookup[p.Y*e.Map.Width+p.X] = true
+		}
+	}
+
+	for y := 0; y < e.Map.Height; y++ {
+		for x := 0; x < e.Map.Width; x++ {
+			// 1. Render the player
+			if e.Player.X == x && e.Player.Y == y {
+				e.screen.WriteString(e.Player.Render())
+				continue
+			}
+
+			tile := e.Map.GetTile(x, y)
+			if tile == nil {
+				continue
+			}
+			isPathTile := pathLookup[y*e.Map.Width+x]
+			// We only draw the path if it's on a tile we've at least explored!
+			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
+			if isPathTile && (tile.Visible || tile.Explored) {
+				// Use a dim character like a period or asterisk.
+				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
+				e.screen.WriteString(world.Red + "*" + world.Reset)
+				continue
+			}
+
+			// 2. Render the map tiles
+			if tile.Visible {
+				e.screen.WriteString(e.Theme[tile.Type])
+				continue
+			}
+
+			if tile.Explored {
+				// We wrap the character in Gray and Reset to "dim" the lights
+				// Note: We use the character from Classic to keep the 'memory' simple
+				char := e.Theme[tile.Type]
+				e.screen.WriteString(world.Gray + char + world.Reset)
+				continue
+			}
+
+			e.screen.WriteString(e.Theme[world.TileTypeEmpty])
+		}
+
+		e.screen.WriteString(lineBreak)
+	}
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color string) {
