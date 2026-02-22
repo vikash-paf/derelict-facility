@@ -219,13 +219,11 @@ func (e *Engine) render() {
 	e.screen.Reset()
 	e.screen.WriteString(cursorHome)
 
-	e.renderMapLayer()
-
 	switch e.State {
 	case GameStatePaused:
 		e.renderPauseMenu()
 	case GameStateRunning:
-		// do nothing because the map is rendered above
+		e.renderMapLayer()
 	}
 
 	// e.renderHUD() // todo: implement HUD
