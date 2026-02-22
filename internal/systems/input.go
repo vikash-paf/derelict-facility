@@ -15,15 +15,15 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 	for _, event := range events {
 		switch event.Key {
-		case 'w':
+		case core.KeyW:
 			dy = -1
-		case 's':
+		case core.KeyS:
 			dy = 1
-		case 'a':
+		case core.KeyA:
 			dx = -1
-		case 'd':
+		case core.KeyD:
 			dx = 1
-		case 'p':
+		case core.KeyP:
 			toggleAutopilot = true
 		}
 	}

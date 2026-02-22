@@ -60,9 +60,7 @@ func NewEngine(
 func (e *Engine) Run() error {
 	for !e.Display.ShouldClose() && e.Running {
 		events := e.Display.PollInput()
-		for _, event := range events {
-			e.handleInput(event)
-		}
+		e.handleInputForGlobals(events)
 
 		if e.State == GameStateRunning {
 			e.Update(events) // Calculate all game rules!
@@ -74,29 +72,19 @@ func (e *Engine) Run() error {
 	return nil
 }
 
-func (e *Engine) handleInput(event core.InputEvent) {
-	if event.Quit {
-		e.Running = false
-		return
-	}
-
-	if event.Key == 'q' {
-		e.Running = false
-		return
-	}
-
-	if event.Key == 27 {
-		// handle the escape button to toggle the game state
-		if e.State == GameStateRunning {
-			e.State = GameStatePaused
-		} else {
-			e.State = GameStateRunning
+func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
+	for _, event := range events {
+		if event.Quit || event.Key == core.KeyQ {
+			e.Running = false
+			return
 		}
-	}
-
-	// We ONLY pass input to systems if the game is running
-	if e.State == GameStateRunning {
-		// e.processSimulation() handles processing these events via ECS systems instead
+		if event.Key == core.KeyEsc { // Escape
+			if e.State == GameStateRunning {
+				e.State = GameStatePaused
+			} else {
+				e.State = GameStateRunning
+			}
+		}
 	}
 }
 

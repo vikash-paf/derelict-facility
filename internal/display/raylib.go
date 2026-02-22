@@ -95,22 +95,22 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	var events []core.InputEvent
 
 	if rl.IsKeyPressed(rl.KeyW) || rl.IsKeyPressedRepeat(rl.KeyW) {
-		events = append(events, core.InputEvent{Key: 'w'})
+		events = append(events, core.InputEvent{Key: core.KeyW})
 	}
 	if rl.IsKeyPressed(rl.KeyS) || rl.IsKeyPressedRepeat(rl.KeyS) {
-		events = append(events, core.InputEvent{Key: 's'})
+		events = append(events, core.InputEvent{Key: core.KeyS})
 	}
 	if rl.IsKeyPressed(rl.KeyA) || rl.IsKeyPressedRepeat(rl.KeyA) {
-		events = append(events, core.InputEvent{Key: 'a'})
+		events = append(events, core.InputEvent{Key: core.KeyA})
 	}
 	if rl.IsKeyPressed(rl.KeyD) || rl.IsKeyPressedRepeat(rl.KeyD) {
-		events = append(events, core.InputEvent{Key: 'd'})
+		events = append(events, core.InputEvent{Key: core.KeyD})
 	}
 	if rl.IsKeyPressed(rl.KeyP) {
-		events = append(events, core.InputEvent{Key: 'p'})
+		events = append(events, core.InputEvent{Key: core.KeyP})
 	}
 	if rl.IsKeyPressed(rl.KeyQ) {
-		events = append(events, core.InputEvent{Key: 'q'})
+		events = append(events, core.InputEvent{Key: core.KeyQ})
 	}
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		events = append(events, core.InputEvent{Key: core.KeyEsc})
