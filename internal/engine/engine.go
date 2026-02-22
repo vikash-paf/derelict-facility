@@ -121,6 +121,13 @@ func (e *Engine) render() {
 	e.screen.Reset()
 	e.screen.WriteString(cursorHome)
 
+	pathLookup := make(map[int]bool)
+	if e.Player.Autopilot {
+		for _, p := range e.Player.CurrentPath {
+			pathLookup[p.Y*e.Map.Width+p.X] = true
+		}
+	}
+
 	for y := 0; y < e.Map.Height; y++ {
 		for x := 0; x < e.Map.Width; x++ {
 			// 1. Render the player
@@ -129,12 +136,21 @@ func (e *Engine) render() {
 				continue
 			}
 
-			// 2. Render the map tiles
 			tile := e.Map.GetTile(x, y)
 			if tile == nil {
 				continue
 			}
+			isPathTile := pathLookup[y*e.Map.Width+x]
+			// We only draw the path if it's on a tile we've at least explored!
+			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
+			if isPathTile && (tile.Visible || tile.Explored) {
+				// Use a dim character like a period or asterisk.
+				// If you have a Yellow or Red ANSI code, use it here to make it look like a scanner!
+				e.screen.WriteString(world.Red + "*" + world.Reset)
+				continue
+			}
 
+			// 2. Render the map tiles
 			if tile.Visible {
 				e.screen.WriteString(e.Theme[tile.Type])
 				continue
