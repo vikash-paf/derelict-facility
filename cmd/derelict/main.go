@@ -12,11 +12,11 @@ import (
 )
 
 func main() {
-	mapWidth, mapHeight := 30, 20
-	windowWidth, windowHeight := 30, 24
+	mapWidth, mapHeight := 80, 45
+	windowWidth, windowHeight := 80, 50
 
-	cellWidth := int32(48)
-	cellHeight := int32(48)
+	cellWidth := int32(16)
+	cellHeight := int32(16)
 	fontSize := int32(16)
 	fontPath := "assets/fonts/FiraCodeNFBoldMono.ttf"
 
