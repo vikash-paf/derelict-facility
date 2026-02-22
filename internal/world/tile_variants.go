@@ -5,15 +5,16 @@ const maxTileTypes = 3
 
 // ANSI Color Codes for easy mixing and matching
 const (
-	Reset   = "\x1b[0m"
-	Red     = "\x1b[31m"
-	Green   = "\x1b[32m"
-	Yellow  = "\x1b[33m"
-	Blue    = "\x1b[34m"
-	Magenta = "\x1b[35m"
-	Cyan    = "\x1b[36m"
-	White   = "\x1b[37m"
-	Gray    = "\x1b[90m"
+	Reset       = "\x1b[0m"
+	Red         = "\x1b[31m"
+	Green       = "\x1b[32m"
+	Yellow      = "\x1b[33m"
+	Blue        = "\x1b[34m"
+	Magenta     = "\x1b[35m"
+	Cyan        = "\x1b[36m"
+	White       = "\x1b[37m"
+	Gray        = "\x1b[90m"
+	BrightWhite = "\x1b[97m"
 )
 
 type TileVariant [maxTileTypes]string

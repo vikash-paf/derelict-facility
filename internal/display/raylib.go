@@ -43,7 +43,7 @@ func (r *RaylibDisplay) EndFrame() {
 }
 
 func (r *RaylibDisplay) Clear(colorHex uint32) {
-	rl.ClearBackground(rl.GetColor(colorHex))
+	rl.ClearBackground(rl.GetColor(uint(colorHex)))
 }
 
 func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
@@ -52,7 +52,7 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 
 	// Adjust Y to perfectly align font within the tile if necessary.
 	// We'll just draw directly.
-	rl.DrawText(text, pixelX, pixelY, r.FontSize, rl.GetColor(colorHex))
+	rl.DrawText(text, pixelX, pixelY, r.FontSize, rl.GetColor(uint(colorHex)))
 }
 
 func (r *RaylibDisplay) PollInput() []core.InputEvent {
@@ -86,15 +86,15 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 // MapANSIColor Helper method for Color Mapper
 func MapANSIColor(ansiColor string) uint32 {
 	colorMap := map[string]uint32{
-		world.Red:     0xFF0000FF,
-		world.Green:   0x00FF00FF,
-		world.Yellow:  0xFFFF00FF,
-		world.Blue:    0x0000FFFF,
-		world.Magenta: 0xFF00FFFF,
-		world.Cyan:    0x00FFFFFF,
-		world.White:   0xFFFFFFFF,
-		world.Gray:    0x808080FF,
-		"\x1b[97m":    0xFFFFFFFF, // Bright white
+		world.Red:         0xFF0000FF,
+		world.Green:       0x00FF00FF,
+		world.Yellow:      0xFFFF00FF,
+		world.Blue:        0x0000FFFF,
+		world.Magenta:     0xFF00FFFF,
+		world.Cyan:        0x00FFFFFF,
+		world.White:       0xFFFFFFFF,
+		world.Gray:        0x808080FF,
+		world.BrightWhite: 0xFFFFFFFF,
 	}
 
 	if hex, ok := colorMap[ansiColor]; ok {
