@@ -1,5 +1,9 @@
 package world
 
+import (
+	"github.com/vikash-paf/derelict-facility/internal/entity"
+)
+
 type Map struct {
 	Tiles  []Tile
 	Rooms  []Rect
@@ -13,6 +17,24 @@ func NewMap(width, height int) *Map {
 		Height: height,
 		Tiles:  make([]Tile, width*height),
 	}
+}
+
+func (m *Map) IsWalkable(x, y int) bool {
+	tile := m.GetTile(x, y)
+	if tile == nil {
+		return false
+	}
+	return tile.Walkable
+}
+
+// GetIndex converts 2D coordinates into a 1D array index.
+func (m *Map) GetIndex(x, y int) int {
+	return y*m.Width + x
+}
+
+// GetIndexFromPoint is a convenience wrapper for our Point struct.
+func (m *Map) GetIndexFromPoint(p entity.Point) int {
+	return p.Y*m.Width + p.X
 }
 
 func (m *Map) SetTile(x, y int, tile Tile) {
