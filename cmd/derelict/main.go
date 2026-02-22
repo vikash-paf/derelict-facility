@@ -38,14 +38,14 @@ func main() {
 
 	playerEnt := ecsWorld.CreateEntity()
 	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "", ColorCode: world.Magenta})
+	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "👷", ColorCode: world.Magenta})
 	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,
 	})
 
 	// 4. Hand everything to the Engine
-	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantCold)
+	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty)
 
 	err = gameEngine.Run()
 	if err != nil {
