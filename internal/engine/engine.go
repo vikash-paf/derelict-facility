@@ -65,7 +65,7 @@ func (e *Engine) Run() error {
 		}
 
 		if e.State == GameStateRunning {
-			e.Update() // Calculate all game rules!
+			e.Update(events) // Calculate all game rules!
 		}
 
 		e.render() // Paint the results!
@@ -100,7 +100,7 @@ func (e *Engine) handleInput(event core.InputEvent) {
 	}
 }
 
-func (e *Engine) Update() {
+func (e *Engine) Update(events []core.InputEvent) {
 	e.tickCount++
 
 	switch e.State {
@@ -108,7 +108,7 @@ func (e *Engine) Update() {
 		// do nothing, the world is frozen
 		// later: implement it to save the game
 	case GameStateRunning:
-		e.processSimulation()
+		e.processSimulation(events)
 	}
 }
 
@@ -116,15 +116,8 @@ func (e *Engine) processAutopilot() {
 	// Replaced by systems.ProcessAutopilot
 }
 
-func (e *Engine) processSimulation() {
-	// Let the systems tick!
-
-	// The Input system handles the raw events we polled
-	// However, we process input directly inside handleInput to remain frame-accurate,
-	// so for now we'll fetch input polling from display here instead of previously
-	events := e.Display.PollInput()
-	e.handleInputForGlobals(events) // Filter out Q and ESC
-
+func (e *Engine) processSimulation(events []core.InputEvent) {
+	// Let the systems tick using the events we polled at the start of the frame!
 	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map)
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
@@ -138,24 +131,6 @@ func (e *Engine) processSimulation() {
 		if posRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePosition); posRaw != nil {
 			pos := posRaw.(*components.Position)
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius)
-		}
-	}
-}
-
-// handleInputForGlobals processes ESC and Q to quit/pause the game,
-// bypassing the ECS Input System which only handles movement.
-func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
-	for _, event := range events {
-		if event.Quit || event.Key == 'q' {
-			e.Running = false
-			return
-		}
-		if event.Key == 27 { // Escape
-			if e.State == GameStateRunning {
-				e.State = GameStatePaused
-			} else {
-				e.State = GameStateRunning
-			}
 		}
 	}
 }
