@@ -10,7 +10,7 @@ import (
 )
 
 // ProcessAutopilot handles the AI pathing logic for any Entity with PlayerControl.
-func ProcessAutopilot(w *ecs.World, gameMap *world.Map) {
+func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder) {
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
@@ -32,7 +32,7 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map) {
 				target := entity.Point{X: targetX, Y: targetY}
 
 				// Calculate the path
-				path := world.FindPath(gameMap, start, target)
+				path := pf.FindPath(gameMap, start, target)
 
 				if len(path) > 1 {
 					ctrl.CurrentPath = path[1:]

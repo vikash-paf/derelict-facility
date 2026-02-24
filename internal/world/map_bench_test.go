@@ -7,7 +7,9 @@ import (
 
 func BenchmarkGetLine_Diagonal(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = getLine(0, 0, 20, 20)
+		getLine(0, 0, 20, 20, func(x, y int) bool {
+			return true
+		})
 	}
 }
 

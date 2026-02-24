@@ -34,6 +34,7 @@ type Engine struct {
 	State      GameState
 	Running    bool
 	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
+	Pathfinder *world.Pathfinder
 }
 
 func NewEngine(
@@ -51,6 +52,7 @@ func NewEngine(
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
 		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
+		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 	}
 
 	return e
@@ -110,7 +112,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
 	if e.tickCount%2 == 0 {
-		systems.ProcessAutopilot(e.EcsWorld, e.Map)
+		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
 	// Calculate FOV (We need to find the player's position first in an ECS)

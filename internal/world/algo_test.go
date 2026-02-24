@@ -107,7 +107,11 @@ func TestGetLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getLine(tt.x0, tt.y0, tt.x1, tt.y1)
+			var result []entity.Point
+			getLine(tt.x0, tt.y0, tt.x1, tt.y1, func(x, y int) bool {
+				result = append(result, entity.Point{X: x, Y: y})
+				return true
+			})
 
 			if !reflect.DeepEqual(result, tt.expected) {
 				fmt.Println(renderDebug(result, tt.x1-tt.x0, tt.y1-tt.y0))
