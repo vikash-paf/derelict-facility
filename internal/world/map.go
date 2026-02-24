@@ -74,6 +74,7 @@ func (m *Map) ComputeFOV(playerX, playerY int, radius int, blocksLight func(x, y
 
 	// the player can always see their own tile
 	m.Tiles[playerX+playerY*m.Width].Visible = true
+	m.Tiles[playerX+playerY*m.Width].Distance = 0
 }
 
 func (m *Map) castRay(x1, y1, x2, y2 int, blocksLight func(x, y int) bool) {
@@ -89,6 +90,21 @@ func (m *Map) castRay(x1, y1, x2, y2 int, blocksLight func(x, y int) bool) {
 
 		m.Tiles[idx].Visible = true
 		m.Tiles[idx].Explored = true
+
+		// Approximate distance using chebyshev/manhattan or simple max component
+		dx := x - x1
+		if dx < 0 {
+			dx = -dx
+		}
+		dy := y - y1
+		if dy < 0 {
+			dy = -dy
+		}
+		dist := dx
+		if dy > dx {
+			dist = dy
+		}
+		m.Tiles[idx].Distance = dist
 
 		// Use the callback to decide if light passes through
 		if blocksLight(x, y) {

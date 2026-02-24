@@ -232,6 +232,14 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 				}
 
+				// Apply depth shading to the foreground color based on distance
+				if tile.Distance > 3 {
+					color = display.DarkenColor(color, 2)
+				}
+				if tile.Distance > 5 {
+					color = display.DarkenColor(color, 2)
+				}
+
 				e.Display.DrawText(x, y, char, color)
 				continue
 			}
