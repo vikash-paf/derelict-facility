@@ -6,32 +6,8 @@ on:
       - 'v*' # Triggers on v0.1, v0.2, etc.
 
 jobs:
-  build:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            binary_name: derelict_linux
-            cc: x86_64-unknown-linux-gnu-gcc
-            cxx: x86_64-unknown-linux-gnu-g++
-          - goos: windows
-            goarch: amd64
-            binary_name: derelict_win.exe
-            cc: x86_64-w64-mingw32-gcc
-            cxx: x86_64-w64-mingw32-g++
-          - goos: darwin
-            goarch: amd64
-            binary_name: derelict_mac_intel
-            cc: clang
-            cxx: clang++
-          - goos: darwin
-            goarch: arm64
-            binary_name: derelict_mac_apple
-            cc: clang
-            cxx: clang++
-
+  build-linux-windows:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -41,36 +17,69 @@ jobs:
         with:
           go-version: '1.24.0'
 
-      - name: Install Cross-Compilers (macOS)
+      - name: Install Dependencies
         run: |
-          brew install mingw-w64
-          brew install messense/macos-cross-toolchains/x86_64-unknown-linux-gnu
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64 libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
 
-      - name: Build Binary
+      - name: Build Linux
         run: |
-          CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
-          go build -v -ldflags="-s -w" \
-          -o bin/${{ matrix.binary_name }} ./cmd/derelict
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+          go build -v -ldflags="-s -w" -o bin/derelict_linux ./cmd/derelict
+
+      - name: Build Windows
+        run: |
+          CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_win.exe ./cmd/derelict
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.binary_name }}
-          path: bin/${{ matrix.binary_name }}
+          name: derelict-binaries-linux-win
+          path: bin/*
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+
+      - name: Build macOS Intel
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CC=clang CXX=clang++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_mac_intel ./cmd/derelict
+
+      - name: Build macOS ARM
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CC=clang CXX=clang++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_mac_apple ./cmd/derelict
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: derelict-binaries-mac
+          path: bin/*
 
   release:
-    needs: build
+    needs: [build-linux-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: derelict-binaries-*
           path: artifacts
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: artifacts/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
