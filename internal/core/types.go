@@ -15,4 +15,5 @@ const (
 	KeyD     = 'd'
 	KeyP     = 'p'
 	KeyQ     = 'q'
+	KeyE     = 'e'
 )

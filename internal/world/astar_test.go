@@ -28,7 +28,9 @@ func TestFindPath_StraightLine(t *testing.T) {
 	target := entity.Point{X: 1, Y: 5}
 
 	pf := NewPathfinder(m.Width, m.Height)
-	path := pf.FindPath(m, start, target)
+	path := pf.FindPath(m, start, target, func(x, y int) bool {
+		return m.IsWalkable(x, y)
+	})
 
 	if len(path) == 0 {
 		t.Fatal("Failed to find a straight path")
@@ -52,7 +54,9 @@ func TestFindPath_Obstacle(t *testing.T) {
 	target := entity.Point{X: 3, Y: 2}
 
 	pf := NewPathfinder(m.Width, m.Height)
-	path := pf.FindPath(m, start, target)
+	path := pf.FindPath(m, start, target, func(x, y int) bool {
+		return m.IsWalkable(x, y)
+	})
 
 	if len(path) == 0 {
 		t.Fatal("Failed to find path around obstacle")
@@ -76,7 +80,9 @@ func TestFindPath_NoPath(t *testing.T) {
 	target := entity.Point{X: 0, Y: 0}
 
 	pf := NewPathfinder(m.Width, m.Height)
-	path := pf.FindPath(m, start, target)
+	path := pf.FindPath(m, start, target, func(x, y int) bool {
+		return m.IsWalkable(x, y)
+	})
 
 	if path != nil {
 		t.Errorf("Expected nil path for blocked target, got %v", path)
@@ -94,7 +100,9 @@ func TestFindPath_Regression_HeapIndex(t *testing.T) {
 	// without a panic and reaches the target is a good sign for the logic
 	// we implemented with openSetTracker and HeapIndex.
 	pf := NewPathfinder(m.Width, m.Height)
-	path := pf.FindPath(m, start, target)
+	path := pf.FindPath(m, start, target, func(x, y int) bool {
+		return m.IsWalkable(x, y)
+	})
 	if len(path) == 0 || path[len(path)-1] != target {
 		t.Errorf("Failed basic connectivity with HeapIndex logic")
 	}
@@ -112,7 +120,9 @@ func TestVisual_PathfindingCorridor(t *testing.T) {
 	target := entity.Point{X: 9, Y: 1}
 
 	pf := NewPathfinder(m.Width, m.Height)
-	path := pf.FindPath(m, start, target)
+	path := pf.FindPath(m, start, target, func(x, y int) bool {
+		return m.IsWalkable(x, y)
+	})
 
 	if len(path) == 0 {
 		t.Error("Failed to find path through the gap")

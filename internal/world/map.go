@@ -7,6 +7,7 @@ import (
 type Map struct {
 	Tiles  []Tile
 	Rooms  []Rect
+	Doors  []entity.Point
 	Width  int
 	Height int
 }
@@ -50,9 +51,19 @@ func (m *Map) GetTile(x, y int) *Tile {
 	return &m.Tiles[x+y*m.Width]
 }
 
-func (m *Map) ComputeFOV(playerX, playerY int, radius int) {
+func (m *Map) ComputeFOV(playerX, playerY int, radius int, blocksLight func(x, y int) bool, powerOn bool) {
 	for i := range m.Tiles {
-		m.Tiles[i].Visible = false
+		if powerOn {
+			m.Tiles[i].Visible = true
+			m.Tiles[i].Explored = true
+			m.Tiles[i].Distance = 0
+		} else {
+			m.Tiles[i].Visible = false
+		}
+	}
+
+	if powerOn {
+		return // The whole map is lit, no need to cast rays!
 	}
 
 	// clamp the bounding box so we stay inside the map
@@ -63,20 +74,21 @@ func (m *Map) ComputeFOV(playerX, playerY int, radius int) {
 
 	// cast rays only to the parts of the perimeter that exist
 	for x := minX; x <= maxX; x++ {
-		m.castRay(playerX, playerY, x, minY) // Top edge
-		m.castRay(playerX, playerY, x, maxY) // Bottom edge
+		m.castRay(playerX, playerY, x, minY, blocksLight) // Top edge
+		m.castRay(playerX, playerY, x, maxY, blocksLight) // Bottom edge
 	}
 
 	for y := minY; y <= maxY; y++ {
-		m.castRay(playerX, playerY, minX, y) // Left edge
-		m.castRay(playerX, playerY, maxX, y) // Right edge
+		m.castRay(playerX, playerY, minX, y, blocksLight) // Left edge
+		m.castRay(playerX, playerY, maxX, y, blocksLight) // Right edge
 	}
 
 	// the player can always see their own tile
 	m.Tiles[playerX+playerY*m.Width].Visible = true
+	m.Tiles[playerX+playerY*m.Width].Distance = 0
 }
 
-func (m *Map) castRay(x1, y1, x2, y2 int) {
+func (m *Map) castRay(x1, y1, x2, y2 int, blocksLight func(x, y int) bool) {
 	// implement cast the "ray" using Bresenham's line algorithm'
 
 	getLine(x1, y1, x2, y2, func(x, y int) bool {
@@ -90,8 +102,23 @@ func (m *Map) castRay(x1, y1, x2, y2 int) {
 		m.Tiles[idx].Visible = true
 		m.Tiles[idx].Explored = true
 
-		// if the tile is not walkable then light can't pass through
-		if !m.Tiles[idx].Walkable {
+		// Approximate distance using chebyshev/manhattan or simple max component
+		dx := x - x1
+		if dx < 0 {
+			dx = -dx
+		}
+		dy := y - y1
+		if dy < 0 {
+			dy = -dy
+		}
+		dist := dx
+		if dy > dx {
+			dist = dy
+		}
+		m.Tiles[idx].Distance = dist
+
+		// Use the callback to decide if light passes through
+		if blocksLight(x, y) {
 			return false
 		}
 

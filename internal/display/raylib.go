@@ -28,6 +28,7 @@ func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *R
 }
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
+	rl.ClearWindowState(rl.FlagWindowTransparent) // Fix transparency issue on some Linux window managers
 	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
 	rl.SetTargetFPS(60)
 	rl.SetExitKey(0)
@@ -84,6 +85,16 @@ func (r *RaylibDisplay) Clear(colorHex uint32) {
 	rl.ClearBackground(rl.GetColor(uint(colorHex)))
 }
 
+func (r *RaylibDisplay) DrawRect(gridX, gridY int, colorHex uint32) {
+	rl.DrawRectangle(
+		int32(gridX)*r.CellWidth,
+		int32(gridY)*r.CellHeight,
+		r.CellWidth,
+		r.CellHeight,
+		rl.GetColor(uint(colorHex)),
+	)
+}
+
 func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
 	pixelY := int32(gridY) * r.CellHeight
 
@@ -137,6 +148,9 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	if rl.IsKeyPressed(rl.KeyQ) {
 		events = append(events, core.InputEvent{Key: core.KeyQ})
 	}
+	if rl.IsKeyPressed(rl.KeyE) {
+		events = append(events, core.InputEvent{Key: core.KeyE})
+	}
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		events = append(events, core.InputEvent{Key: core.KeyEsc})
 	}
@@ -166,4 +180,21 @@ func ExtractTextAndColor(s string) (string, uint32) {
 	colorCode := s[:mIdx+1]
 	text := strings.ReplaceAll(s[mIdx+1:], world.Reset, "")
 	return text, MapANSIColor(colorCode)
+}
+
+// DarkenColor takes a hex color and reduces its brightness by the given factor.
+func DarkenColor(colorHex uint32, factor uint32) uint32 {
+	if factor <= 1 {
+		return colorHex
+	}
+	r := (colorHex >> 24) & 0xFF
+	g := (colorHex >> 16) & 0xFF
+	b := (colorHex >> 8) & 0xFF
+	a := colorHex & 0xFF
+
+	r = r / factor
+	g = g / factor
+	b = b / factor
+
+	return (r << 24) | (g << 16) | (b << 8) | a
 }

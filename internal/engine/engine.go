@@ -28,7 +28,7 @@ type Engine struct {
 	Display    display.Display
 	Map        *world.Map
 	EcsWorld   *ecs.World // Replaces Player
-	Theme      world.TileVariant
+	BaseTheme  world.TileVariant
 	TickerRate time.Duration
 	tickCount  int
 	State      GameState
@@ -50,7 +50,7 @@ func NewEngine(
 		State:      GameStateRunning,
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
-		Theme:      startingTheme,
+		BaseTheme:  startingTheme,
 		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
 		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 	}
@@ -115,12 +115,22 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
-	// Calculate FOV (We need to find the player's position first in an ECS)
+	powerOn := systems.IsPowerActive(e.EcsWorld)
+
+	// Calculate FOV
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
-			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius)
+
+			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
+				// 1. Is the map tile a wall?
+				if !e.Map.IsWalkable(x, y) {
+					return true
+				}
+				// 2. Is there a Solid entity (like a closed door)?
+				return systems.IsSolidAt(e.EcsWorld, x, y)
+			}, powerOn)
 			break // Compute FOV for the first player found
 		}
 	}
@@ -142,13 +152,14 @@ func (e *Engine) render() {
 	e.Display.BeginFrame()
 	e.Display.Clear(0x000000FF) // Black background
 
-	renderTheme := e.Theme
+	// Determine active theme based on global states
+	activeTheme := e.BaseTheme
 
 	if e.State == GameStatePaused {
-		renderTheme = world.TileVariantPaused
+		activeTheme = world.TileVariantPaused
 	}
 
-	e.renderMapLayer(renderTheme)
+	e.renderMapLayer(activeTheme)
 	systems.RenderEntities(e.EcsWorld, e.Display, e.Map)
 	e.renderHUD()
 
@@ -169,6 +180,8 @@ func (e *Engine) renderPauseMenu() {
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	clear(e.PathLookup)
+
+	powerOn := systems.IsPowerActive(e.EcsWorld)
 
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
 	targetMask := components.MaskPlayerControl
@@ -193,35 +206,135 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawSprite(x, y, 22, 12, display.MapANSIColor(world.Red)) // '22, 12' as a placeholder path pip
+				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
 				continue
 			}
 
-			// 2. Map TileType to a Sprite Coordinate
-			// Using compact 4x4 tileset.png coordinates:
-			sheetX, sheetY := -1, -1
-			switch tile.Type {
-			case world.TileTypeWall:
-				sheetX, sheetY = 0, 1 // Rusty Metal Door/Wall (Row 2, Column 1)
-			case world.TileTypeFloor:
-				sheetY = 0
-				sheetX = 0 // Plain Metal Panel (Row 1, Column 1)
-			case world.TileTypeEmpty:
-				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
+			if tile.Type == world.TileTypeEmpty {
+				continue
 			}
 
-			if sheetX == -1 {
-				continue // Skip rendering empty coordinates
-			}
-
+			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
-				_, color := display.ExtractTextAndColor(theme[tile.Type])
-				e.Display.DrawSprite(x, y, sheetX, sheetY, color)
+				char, color := display.ExtractTextAndColor(theme[tile.Type])
+
+				// Add texture to floors based on their Variant
+				if tile.Type == world.TileTypeFloor {
+					switch tile.Variant {
+					case 1:
+						char = "."
+					case 2:
+						char = ","
+					case 3:
+						char = "`"
+					case 4:
+						char = "'"
+					default:
+						char = " " // Empty space for most floors to reduce noise
+					}
+				}
+
+				// Apply auto-tiling to walls based on their Bitmask
+				if tile.Type == world.TileTypeWall {
+					// Check if we are using the "blueprint/connected" theme.
+					// We only auto-tile if the base character is an intersection/block type that makes sense to connect
+					if char == "╬" || char == "#" || char == "█" || char == "▓" {
+						switch tile.Bitmask {
+						case 0:
+							char = "O" // Pillar (no neighbors)
+						case 1, 4, 5:
+							char = "║" // Vertical (North, South, or Both)
+						case 2, 8, 10:
+							char = "═" // Horizontal (East, West, or Both)
+						case 3:
+							char = "╚" // North + East
+						case 6:
+							char = "╔" // East + South
+						case 12:
+							char = "╗" // South + West
+						case 9:
+							char = "╝" // West + North
+						case 7:
+							char = "╠" // North + East + South
+						case 14:
+							char = "╦" // East + South + West
+						case 13:
+							char = "╣" // South + West + North
+						case 11:
+							char = "╩" // West + North + East
+						case 15:
+							char = "╬" // All 4 directions
+						}
+					}
+				}
+
+				// Apply depth shading to the foreground color based on distance
+				if !powerOn {
+					if tile.Distance > 3 {
+						color = display.DarkenColor(color, 2)
+					}
+					if tile.Distance > 5 {
+						color = display.DarkenColor(color, 2)
+					}
+				}
+
+				e.Display.DrawText(x, y, char, color)
 				continue
 			}
 
 			if tile.Explored {
-				e.Display.DrawSprite(x, y, sheetX, sheetY, display.MapANSIColor(world.Gray))
+				char, color := display.ExtractTextAndColor(theme[tile.Type])
+
+				// Apply the same texture to explored floors
+				if tile.Type == world.TileTypeFloor {
+					switch tile.Variant {
+					case 1:
+						char = "."
+					case 2:
+						char = ","
+					case 3:
+						char = "`"
+					case 4:
+						char = "'"
+					default:
+						char = " "
+					}
+				}
+
+				if tile.Type == world.TileTypeWall {
+					if char == "╬" || char == "#" || char == "█" || char == "▓" {
+						switch tile.Bitmask {
+						case 0:
+							char = "O" // Pillar (no neighbors)
+						case 1, 4, 5:
+							char = "║" // Vertical (North, South, or Both)
+						case 2, 8, 10:
+							char = "═" // Horizontal (East, West, or Both)
+						case 3:
+							char = "╚" // North + East
+						case 6:
+							char = "╔" // East + South
+						case 12:
+							char = "╗" // South + West
+						case 9:
+							char = "╝" // West + North
+						case 7:
+							char = "╠" // North + East + South
+						case 14:
+							char = "╦" // East + South + West
+						case 13:
+							char = "╣" // South + West + North
+						case 11:
+							char = "╩" // West + North + East
+						case 15:
+							char = "╬" // All 4 directions
+						}
+					}
+				}
+
+				// Render explored tiles in a dimmed version of their theme color, not flat gray
+				dimColor := display.DarkenColor(color, 4)
+				e.Display.DrawText(x, y, char, dimColor)
 				continue
 			}
 
@@ -241,17 +354,35 @@ func (e *Engine) renderHUD() {
 
 	statusText := "HEALTHY"
 	autopilotEngaged := false
+	var interactPrompt string // Store the prompt text if near an interactable
 
 	// Find player state for HUD
-	targetMask := components.MaskPlayerControl
+	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			ctrl := e.EcsWorld.PlayerControls[i]
+			pos := e.EcsWorld.Positions[i]
+
 			autopilotEngaged = ctrl.Autopilot
 			if ctrl.Status == components.PlayerStatusSick {
 				statusText = "SICK / TOXIC"
 			} else if ctrl.Status == components.PlayerStatusHurt {
 				statusText = "CRITICAL"
+			}
+
+			// Check for adjacent interactables
+			interactMask := components.MaskPosition | components.MaskInteractable
+			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
+				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
+					targetPos := e.EcsWorld.Positions[j]
+					dx := targetPos.X - pos.X
+					dy := targetPos.Y - pos.Y
+					if (dx*dx + dy*dy) <= 2 { // 1 tile away
+						interact := e.EcsWorld.Interactables[j]
+						interactPrompt = interact.Prompt
+						break
+					}
+				}
 			}
 			break
 		}
@@ -268,6 +399,13 @@ func (e *Engine) renderHUD() {
 	// %06d formats the integer to always be 6 digits (e.g., 000142)
 	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
 	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, world.White)
+
+	if interactPrompt != "" {
+		// Draw the prompt blinking above the HUD
+		if e.tickCount%30 < 15 {
+			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), world.Green)
+		}
+	}
 
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
 	e.drawText(2, hudY+2, controls, world.Gray)
