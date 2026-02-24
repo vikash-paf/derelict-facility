@@ -8,29 +8,6 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            binary_name: derelict_linux
-            cc: x86_64-unknown-linux-gnu-gcc
-            cxx: x86_64-unknown-linux-gnu-g++
-          - goos: windows
-            goarch: amd64
-            binary_name: derelict_win.exe
-            cc: x86_64-w64-mingw32-gcc
-            cxx: x86_64-w64-mingw32-g++
-          - goos: darwin
-            goarch: amd64
-            binary_name: derelict_mac_intel
-            cc: clang
-            cxx: clang++
-          - goos: darwin
-            goarch: arm64
-            binary_name: derelict_mac_apple
-            cc: clang
-            cxx: clang++
 
     steps:
       - name: Checkout Code
@@ -46,17 +23,31 @@ jobs:
           brew install mingw-w64
           brew install messense/macos-cross-toolchains/x86_64-unknown-linux-gnu
 
-      - name: Build Binary
+      - name: Build Linux
         run: |
-          CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
-          go build -v -ldflags="-s -w" \
-          -o bin/${{ matrix.binary_name }} ./cmd/derelict
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=x86_64-unknown-linux-gnu-gcc CXX=x86_64-unknown-linux-gnu-g++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_linux ./cmd/derelict
+
+      - name: Build Windows
+        run: |
+          CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_win.exe ./cmd/derelict
+
+      - name: Build macOS Intel
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CC=clang CXX=clang++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_mac_intel ./cmd/derelict
+
+      - name: Build macOS ARM
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CC=clang CXX=clang++ \
+          go build -v -ldflags="-s -w" -o bin/derelict_mac_apple ./cmd/derelict
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.binary_name }}
-          path: bin/${{ matrix.binary_name }}
+          name: derelict-binaries
+          path: bin/*
 
   release:
     needs: build
@@ -65,12 +56,13 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          name: derelict-binaries
           path: artifacts
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: artifacts/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
