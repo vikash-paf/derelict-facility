@@ -193,35 +193,24 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawSprite(x, y, 22, 12, display.MapANSIColor(world.Red)) // '22, 12' as a placeholder path pip
+				e.Display.DrawText(x, y, "•", display.MapANSIColor(world.Red))
 				continue
 			}
 
-			// 2. Map TileType to a Sprite Coordinate
-			// Using compact 4x4 tileset.png coordinates:
-			sheetX, sheetY := -1, -1
-			switch tile.Type {
-			case world.TileTypeWall:
-				sheetX, sheetY = 0, 1 // Rusty Metal Door/Wall (Row 2, Column 1)
-			case world.TileTypeFloor:
-				sheetY = 0
-				sheetX = 0 // Plain Metal Panel (Row 1, Column 1)
-			case world.TileTypeEmpty:
-				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
+			if tile.Type == world.TileTypeEmpty {
+				continue
 			}
 
-			if sheetX == -1 {
-				continue // Skip rendering empty coordinates
-			}
-
+			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
-				_, color := display.ExtractTextAndColor(theme[tile.Type])
-				e.Display.DrawSprite(x, y, sheetX, sheetY, color)
+				char, color := display.ExtractTextAndColor(theme[tile.Type])
+				e.Display.DrawText(x, y, char, color)
 				continue
 			}
 
 			if tile.Explored {
-				e.Display.DrawSprite(x, y, sheetX, sheetY, display.MapANSIColor(world.Gray))
+				char, _ := display.ExtractTextAndColor(theme[tile.Type])
+				e.Display.DrawText(x, y, char, display.MapANSIColor(world.Gray))
 				continue
 			}
 

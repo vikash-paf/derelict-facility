@@ -17,9 +17,12 @@ type World struct {
 	Masks [MaxEntities]components.ComponentMask
 
 	// The Dense Component Arrays (Structure of Arrays)
-	Positions      [MaxEntities]components.Position
-	Sprites        [MaxEntities]components.Sprite
-	PlayerControls [MaxEntities]components.PlayerControl
+	Positions       [MaxEntities]components.Position
+	Sprites         [MaxEntities]components.Sprite
+	PlayerControls  [MaxEntities]components.PlayerControl
+	Glyphs          [MaxEntities]components.Glyph
+	Interactables   [MaxEntities]components.Interactable
+	PowerGenerators [MaxEntities]components.PowerGenerator
 }
 
 func NewWorld() *World {
@@ -66,4 +69,23 @@ func (w *World) AddSprite(e Entity, spr components.Sprite) {
 func (w *World) AddPlayerControl(e Entity, ctrl components.PlayerControl) {
 	w.PlayerControls[e] = ctrl
 	w.Masks[e] |= components.MaskPlayerControl
+}
+
+func (w *World) AddGlyph(e Entity, glyph components.Glyph) {
+	w.Glyphs[e] = glyph
+	w.Masks[e] |= components.MaskGlyph
+}
+
+func (w *World) AddSolid(e Entity) {
+	w.Masks[e] |= components.MaskSolid // No data to store, just set the flag!
+}
+
+func (w *World) AddInteractable(e Entity, interactable components.Interactable) {
+	w.Interactables[e] = interactable
+	w.Masks[e] |= components.MaskInteractable
+}
+
+func (w *World) AddPowerGenerator(e Entity, gen components.PowerGenerator) {
+	w.PowerGenerators[e] = gen
+	w.Masks[e] |= components.MaskPowerGenerator
 }

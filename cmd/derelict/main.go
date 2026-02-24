@@ -38,7 +38,7 @@ func main() {
 
 	playerEnt := ecsWorld.CreateEntity()
 	ecsWorld.AddPosition(playerEnt, components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddSprite(playerEnt, components.Sprite{SheetX: 2, SheetY: 3, ColorCode: world.White}) // Astronaut Idle (Row 3, Column 3)
+	ecsWorld.AddGlyph(playerEnt, components.Glyph{Char: "@", ColorCode: world.BrightWhite}) // Astronaut
 	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,

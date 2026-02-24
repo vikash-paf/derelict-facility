@@ -9,10 +9,14 @@ type ComponentMask uint32
 
 // Define a unique bit for every component type.
 const (
-	MaskNone          ComponentMask = 0
-	MaskPosition      ComponentMask = 1 << iota // 1 (001)
-	MaskSprite                                  // 2 (010)
-	MaskPlayerControl                           // 4 (100)
+	MaskNone           ComponentMask = 0
+	MaskPosition       ComponentMask = 1 << iota // 1 (001)
+	MaskSprite                                   // 2 (010)
+	MaskPlayerControl                            // 4 (100)
+	MaskGlyph                                    // 8
+	MaskSolid                                    // 16
+	MaskInteractable                             // 32
+	MaskPowerGenerator                           // 64
 )
 
 // PlayerStatus represents the health/condition of a player entity.
@@ -45,4 +49,23 @@ type PlayerControl struct {
 	Autopilot   bool
 	CurrentPath []entity.Point
 	Status      PlayerStatus
+}
+
+// Glyph defines the graphical representation of an entity using a text character or emoji.
+type Glyph struct {
+	Char      string
+	ColorCode string // ANSI color code
+}
+
+// Solid indicates this entity cannot be walked through.
+type Solid struct{} // empty struct because the bitmask itself holds the logic!
+
+// Interactable allows the player to trigger an action when standing nearby and pressing [E].
+type Interactable struct {
+	Prompt string
+}
+
+// PowerGenerator is a specific interactive device state.
+type PowerGenerator struct {
+	IsActive bool
 }
