@@ -33,6 +33,7 @@ type Engine struct {
 	tickCount  int
 	State      GameState
 	Running    bool
+	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
 }
 
 func NewEngine(
@@ -49,6 +50,7 @@ func NewEngine(
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
+		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
 	}
 
 	return e
@@ -164,7 +166,7 @@ func (e *Engine) renderPauseMenu() {
 }
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
-	pathLookup := make(map[int]bool)
+	clear(e.PathLookup)
 
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
 	targetMask := components.MaskPlayerControl
@@ -173,7 +175,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			ctrl := e.EcsWorld.PlayerControls[i]
 			if ctrl.Autopilot {
 				for _, p := range ctrl.CurrentPath {
-					pathLookup[p.Y*e.Map.Width+p.X] = true
+					e.PathLookup[p.Y*e.Map.Width+p.X] = true
 				}
 			}
 		}
@@ -185,7 +187,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile == nil {
 				continue
 			}
-			isPathTile := pathLookup[y*e.Map.Width+x]
+			isPathTile := e.PathLookup[y*e.Map.Width+x]
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
