@@ -205,15 +205,18 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile.Visible {
 				char, color := display.ExtractTextAndColor(theme[tile.Type])
 
-				// Draw a continuous background block for ALL tiles to prevent gaps
-				bgColor := display.DarkenColor(color, 4) // Make the background 4x darker than the foreground text
+				// Draw a continuous background block for walls to prevent gaps
+				if tile.Type == world.TileTypeWall {
+					bgColor := display.DarkenColor(color, 3) // Make the background 3x darker than the foreground text
 
-				// If using a full-block or heavy texture character, make the bg match exactly for a solid block
-				if char == "█" || char == "▓" || char == "▒" || char == "░" {
-					bgColor = color
+					// If using a full-block character, make the bg match exactly for a solid wall
+					if char == "█" || char == "▓" || char == "▒" || char == "░" {
+						bgColor = color
+					}
+
+					e.Display.DrawRect(x, y, bgColor)
 				}
 
-				e.Display.DrawRect(x, y, bgColor)
 				e.Display.DrawText(x, y, char, color)
 				continue
 			}
@@ -221,14 +224,16 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile.Explored {
 				char, _ := display.ExtractTextAndColor(theme[tile.Type])
 
-				// Draw a very dark version for explored tiles
-				bgColor := display.MapANSIColor(world.Gray)
-				bgColor = display.DarkenColor(bgColor, 4)
+				if tile.Type == world.TileTypeWall {
+					// Draw a very dark version for explored walls
+					bgColor := display.MapANSIColor(world.Gray)
+					bgColor = display.DarkenColor(bgColor, 3)
 
-				if char == "█" || char == "▓" || char == "▒" || char == "░" {
-					bgColor = display.MapANSIColor(world.Gray)
+					if char == "█" || char == "▓" || char == "▒" || char == "░" {
+						bgColor = display.MapANSIColor(world.Gray)
+					}
+					e.Display.DrawRect(x, y, bgColor)
 				}
-				e.Display.DrawRect(x, y, bgColor)
 
 				e.Display.DrawText(x, y, char, display.MapANSIColor(world.Gray))
 				continue
