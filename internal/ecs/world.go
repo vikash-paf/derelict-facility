@@ -1,67 +1,69 @@
 package ecs
 
+import "github.com/vikash-paf/derelict-facility/internal/components"
+
+// Entity is just an index into the World arrays.
 type Entity uint32
 
-type Component interface{}
+const MaxEntities = 1000
 
+// World manages all entities and their component data in flat arrays (SoA).
 type World struct {
 	nextEntityID Entity
+	freeEntities []Entity // Queue of IDs from destroyed entities we can reuse
 
-	componentStores map[string]map[Entity]Component
+	// The Component Mask array. If Masks[5] has the MaskPosition bit set,
+	// it means Positions[5] contains valid data for Entity 5.
+	Masks [MaxEntities]components.ComponentMask
+
+	// The Dense Component Arrays (Structure of Arrays)
+	Positions      [MaxEntities]components.Position
+	Sprites        [MaxEntities]components.Sprite
+	PlayerControls [MaxEntities]components.PlayerControl
 }
 
 func NewWorld() *World {
 	return &World{
-		nextEntityID:    1,
-		componentStores: make(map[string]map[Entity]Component),
+		nextEntityID: 0, // Start at 0 so it aligns with array indices!
+		freeEntities: make([]Entity, 0),
 	}
 }
 
 func (w *World) CreateEntity() Entity {
-	id := w.nextEntityID
-	w.nextEntityID++
+	var id Entity
+	if len(w.freeEntities) > 0 {
+		// Pop an ID off the free list
+		id = w.freeEntities[len(w.freeEntities)-1]
+		w.freeEntities = w.freeEntities[:len(w.freeEntities)-1]
+	} else {
+		id = w.nextEntityID
+		w.nextEntityID++
+		// If we exceed MaxEntities in a real game, we'd need to grow the arrays or panic.
+		if id >= MaxEntities {
+			panic("Max entities reached!")
+		}
+	}
+
+	w.Masks[id] = components.MaskNone // Clear any old data mask
 	return id
 }
 
 func (w *World) DestroyEntity(e Entity) {
-	for _, store := range w.componentStores {
-		delete(store, e)
-	}
+	w.Masks[e] = components.MaskNone // Unset all bits. The data stays in RAM, but systems will ignore it.
+	w.freeEntities = append(w.freeEntities, e)
 }
 
-func (w *World) AddComponent(e Entity, name string, c Component) {
-	store, exists := w.componentStores[name]
-	if !exists {
-		store = make(map[Entity]Component)
-		w.componentStores[name] = store
-	}
-	store[e] = c
+func (w *World) AddPosition(e Entity, pos components.Position) {
+	w.Positions[e] = pos
+	w.Masks[e] |= components.MaskPosition // Turn ON the bit
 }
 
-func (w *World) GetComponent(e Entity, name string) Component {
-	store, exists := w.componentStores[name]
-	if !exists {
-		return nil
-	}
-	return store[e]
+func (w *World) AddSprite(e Entity, spr components.Sprite) {
+	w.Sprites[e] = spr
+	w.Masks[e] |= components.MaskSprite
 }
 
-func (w *World) RemoveComponent(e Entity, name string) {
-	store, exists := w.componentStores[name]
-	if exists {
-		delete(store, e)
-	}
-}
-
-func (w *World) GetEntitiesWith(componentName string) []Entity {
-	store, exists := w.componentStores[componentName]
-	if !exists {
-		return nil
-	}
-
-	entities := make([]Entity, 0, len(store))
-	for e := range store {
-		entities = append(entities, e)
-	}
-	return entities
+func (w *World) AddPlayerControl(e Entity, ctrl components.PlayerControl) {
+	w.PlayerControls[e] = ctrl
+	w.Masks[e] |= components.MaskPlayerControl
 }

@@ -33,6 +33,8 @@ type Engine struct {
 	tickCount  int
 	State      GameState
 	Running    bool
+	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
+	Pathfinder *world.Pathfinder
 }
 
 func NewEngine(
@@ -49,6 +51,8 @@ func NewEngine(
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		Theme:      startingTheme,
+		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
+		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 	}
 
 	return e
@@ -108,15 +112,16 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
 	if e.tickCount%2 == 0 {
-		systems.ProcessAutopilot(e.EcsWorld, e.Map)
+		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
 	// Calculate FOV (We need to find the player's position first in an ECS)
-	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
-	if len(playerEntities) > 0 {
-		if posRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePosition); posRaw != nil {
-			pos := posRaw.(*components.Position)
+	targetMask := components.MaskPlayerControl | components.MaskPosition
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			pos := e.EcsWorld.Positions[i]
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius)
+			break // Compute FOV for the first player found
 		}
 	}
 }
@@ -144,7 +149,7 @@ func (e *Engine) render() {
 	}
 
 	e.renderMapLayer(renderTheme)
-	systems.RenderEntities(e.EcsWorld, e.Display)
+	systems.RenderEntities(e.EcsWorld, e.Display, e.Map)
 	e.renderHUD()
 
 	switch e.State {
@@ -163,16 +168,16 @@ func (e *Engine) renderPauseMenu() {
 }
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
-	pathLookup := make(map[int]bool)
+	clear(e.PathLookup)
 
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
-	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
-	for _, ent := range playerEntities {
-		if ctrlRaw := e.EcsWorld.GetComponent(ent, components.NamePlayerControl); ctrlRaw != nil {
-			ctrl := ctrlRaw.(*components.PlayerControl)
+	targetMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			ctrl := e.EcsWorld.PlayerControls[i]
 			if ctrl.Autopilot {
 				for _, p := range ctrl.CurrentPath {
-					pathLookup[p.Y*e.Map.Width+p.X] = true
+					e.PathLookup[p.Y*e.Map.Width+p.X] = true
 				}
 			}
 		}
@@ -184,29 +189,44 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile == nil {
 				continue
 			}
-			isPathTile := pathLookup[y*e.Map.Width+x]
+			isPathTile := e.PathLookup[y*e.Map.Width+x]
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
+				e.Display.DrawSprite(x, y, 22, 12, display.MapANSIColor(world.Red)) // '22, 12' as a placeholder path pip
 				continue
 			}
 
-			// 2. Render the map tiles
+			// 2. Map TileType to a Sprite Coordinate
+			// Using compact 4x4 tileset.png coordinates:
+			sheetX, sheetY := -1, -1
+			switch tile.Type {
+			case world.TileTypeWall:
+				sheetX, sheetY = 0, 1 // Rusty Metal Door/Wall (Row 2, Column 1)
+			case world.TileTypeFloor:
+				sheetY = 0
+				sheetX = 0 // Plain Metal Panel (Row 1, Column 1)
+			case world.TileTypeEmpty:
+				sheetX, sheetY = -1, -1 // Do not draw anything for empty space
+			}
+
+			if sheetX == -1 {
+				continue // Skip rendering empty coordinates
+			}
+
 			if tile.Visible {
-				text, color := display.ExtractTextAndColor(theme[tile.Type])
-				e.Display.DrawText(x, y, text, color)
+				_, color := display.ExtractTextAndColor(theme[tile.Type])
+				e.Display.DrawSprite(x, y, sheetX, sheetY, color)
 				continue
 			}
 
 			if tile.Explored {
-				text, _ := display.ExtractTextAndColor(theme[tile.Type])
-				e.Display.DrawText(x, y, text, display.MapANSIColor(world.Gray))
+				e.Display.DrawSprite(x, y, sheetX, sheetY, display.MapANSIColor(world.Gray))
 				continue
 			}
 
-			text, color := display.ExtractTextAndColor(theme[world.TileTypeEmpty])
-			e.Display.DrawText(x, y, text, color)
+			// Unexplored Space
+			// We don't draw anything here so the black background shows through
 		}
 	}
 }
@@ -223,16 +243,17 @@ func (e *Engine) renderHUD() {
 	autopilotEngaged := false
 
 	// Find player state for HUD
-	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
-	if len(playerEntities) > 0 {
-		if ctrlRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePlayerControl); ctrlRaw != nil {
-			ctrl := ctrlRaw.(*components.PlayerControl)
+	targetMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			ctrl := e.EcsWorld.PlayerControls[i]
 			autopilotEngaged = ctrl.Autopilot
 			if ctrl.Status == components.PlayerStatusSick {
 				statusText = "SICK / TOXIC"
 			} else if ctrl.Status == components.PlayerStatusHurt {
 				statusText = "CRITICAL"
 			}
+			break
 		}
 	}
 

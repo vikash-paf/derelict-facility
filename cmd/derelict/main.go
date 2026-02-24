@@ -12,13 +12,13 @@ import (
 )
 
 func main() {
-	mapWidth, mapHeight := 120, 26
-	windowWidth, windowHeight := 120, 30
+	mapWidth, mapHeight := 80, 45
+	windowWidth, windowHeight := 80, 50
 
-	cellWidth := int32(12)
-	cellHeight := int32(24)
-	fontSize := int32(24)
-	fontPath := "assets/fonts/FiraCode-Bold.ttf"
+	cellWidth := int32(16)
+	cellHeight := int32(16)
+	fontSize := int32(16)
+	fontPath := "assets/fonts/FiraCodeNFBoldMono.ttf"
 
 	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize, fontPath)
 
@@ -37,15 +37,15 @@ func main() {
 	ecsWorld := ecs.NewWorld()
 
 	playerEnt := ecsWorld.CreateEntity()
-	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameRenderable, &components.Renderable{Char: "@", ColorCode: world.Green})
-	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
+	ecsWorld.AddPosition(playerEnt, components.Position{X: playerX, Y: playerY})
+	ecsWorld.AddSprite(playerEnt, components.Sprite{SheetX: 2, SheetY: 3, ColorCode: world.White}) // Astronaut Idle (Row 3, Column 3)
+	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,
 	})
 
 	// 4. Hand everything to the Engine
-	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantCold)
+	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty)
 
 	err = gameEngine.Run()
 	if err != nil {

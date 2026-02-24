@@ -79,22 +79,22 @@ func (m *Map) ComputeFOV(playerX, playerY int, radius int) {
 func (m *Map) castRay(x1, y1, x2, y2 int) {
 	// implement cast the "ray" using Bresenham's line algorithm'
 
-	line := getLine(x1, y1, x2, y2)
-
-	for _, p := range line {
+	getLine(x1, y1, x2, y2, func(x, y int) bool {
 		// if the ray goes off the map, stop
-		if p.X < 0 || p.X >= m.Width || p.Y < 0 || p.Y >= m.Height {
-			break
+		if x < 0 || x >= m.Width || y < 0 || y >= m.Height {
+			return false
 		}
 
-		idx := p.X + p.Y*m.Width
+		idx := x + y*m.Width
 
 		m.Tiles[idx].Visible = true
 		m.Tiles[idx].Explored = true
 
 		// if the tile is not walkable then light can't pass through
 		if !m.Tiles[idx].Walkable {
-			break
+			return false
 		}
-	}
+
+		return true // continue drawing the line
+	})
 }

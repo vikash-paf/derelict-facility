@@ -7,19 +7,35 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
-func FindPath(m *Map, start, target entity.Point) []entity.Point {
+// Pathfinder holds reusable buffers for A* pathfinding to avoid allocations.
+type Pathfinder struct {
+	closedSet      []uint64
+	openSetTracker []*algo.Node
+	openSet        algo.PriorityQueue
+	generation     uint64
+}
+
+// NewPathfinder initializes the buffers for a map of the given dimensions.
+func NewPathfinder(width, height int) *Pathfinder {
+	mapArea := width * height
+	return &Pathfinder{
+		closedSet:      make([]uint64, mapArea),
+		openSetTracker: make([]*algo.Node, mapArea),
+		openSet:        make(algo.PriorityQueue, 0, 100),
+		generation:     0,
+	}
+}
+
+func (pf *Pathfinder) FindPath(m *Map, start, target entity.Point) []entity.Point {
 	// 1. Initial Validation
 	targetTile := m.GetTile(target.X, target.Y)
 	if targetTile == nil || !targetTile.Walkable {
 		return nil
 	}
 
-	mapArea := m.Width * m.Height
-	closedSet := make([]bool, mapArea)
-	openSetTracker := make([]*algo.Node, mapArea)
-
-	openSet := make(algo.PriorityQueue, 0)
-	heap.Init(&openSet)
+	pf.generation++
+	pf.openSet = pf.openSet[:0] // Clear queue without reallocating
+	clear(pf.openSetTracker)    // Quickly nil out all pointers
 
 	// Start GCost must be 0 (the distance from start to start is zero)
 	startNode := &algo.Node{
@@ -29,19 +45,19 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 	}
 	startNode.FCost = startNode.GCost + startNode.HCost
 
-	heap.Push(&openSet, startNode)
-	openSetTracker[m.GetIndexFromPoint(start)] = startNode
+	heap.Push(&pf.openSet, startNode)
+	pf.openSetTracker[m.GetIndexFromPoint(start)] = startNode
 
-	for openSet.Len() > 0 {
-		currentNode := heap.Pop(&openSet).(*algo.Node)
+	for pf.openSet.Len() > 0 {
+		currentNode := heap.Pop(&pf.openSet).(*algo.Node)
 		currIdx := m.GetIndexFromPoint(currentNode.Point)
 
 		if currentNode.Point == target {
 			return reconstructPath(currentNode)
 		}
 
-		openSetTracker[currIdx] = nil
-		closedSet[currIdx] = true
+		pf.openSetTracker[currIdx] = nil
+		pf.closedSet[currIdx] = pf.generation
 
 		// Orthogonal neighbors (N, S, E, W)
 		dx := []int{0, 0, 1, -1}
@@ -57,12 +73,12 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 			}
 
 			nIdx := m.GetIndex(nx, ny)
-			if closedSet[nIdx] {
+			if pf.closedSet[nIdx] == pf.generation {
 				continue
 			}
 
 			newGCost := currentNode.GCost + 1
-			neighborNode := openSetTracker[nIdx]
+			neighborNode := pf.openSetTracker[nIdx]
 
 			if neighborNode == nil {
 				// Discover new node
@@ -73,14 +89,14 @@ func FindPath(m *Map, start, target entity.Point) []entity.Point {
 					HCost:  ManhattanDistance(entity.Point{X: nx, Y: ny}, target),
 				}
 				newNode.FCost = newNode.GCost + newNode.HCost
-				heap.Push(&openSet, newNode)
-				openSetTracker[nIdx] = newNode
+				heap.Push(&pf.openSet, newNode)
+				pf.openSetTracker[nIdx] = newNode
 			} else if newGCost < neighborNode.GCost {
 				// Found a more optimal path to a node already in the Open Set
 				neighborNode.Parent = currentNode
 				neighborNode.GCost = newGCost
 				neighborNode.FCost = newGCost + neighborNode.HCost
-				heap.Fix(&openSet, neighborNode.HeapIndex)
+				heap.Fix(&pf.openSet, neighborNode.HeapIndex)
 			}
 		}
 	}

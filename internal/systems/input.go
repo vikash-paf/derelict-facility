@@ -28,38 +28,37 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 		}
 	}
 
-	// Now apply to any Entity with a "PlayerControl" and a "Position" component.
-	entities := w.GetEntitiesWith(components.NamePlayerControl)
-	for _, e := range entities {
-		ctrlRaw := w.GetComponent(e, components.NamePlayerControl)
-		posRaw := w.GetComponent(e, components.NamePosition)
+	targetMask := components.MaskPlayerControl | components.MaskPosition
 
-		if ctrlRaw == nil || posRaw == nil {
-			continue // Entity is malformed
-		}
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (w.Masks[i] & targetMask) == targetMask {
 
-		ctrl := ctrlRaw.(*components.PlayerControl)
-		pos := posRaw.(*components.Position)
+			// IMPORTANT: In Go, if we want to modify the struct inside the array,
+			// we must use a pointer to the array index!
+			// If we did `ctrl := w.PlayerControls[i]`, we'd be modifying a copy.
+			ctrl := &w.PlayerControls[i]
+			pos := &w.Positions[i]
 
-		if toggleAutopilot {
-			ctrl.Autopilot = !ctrl.Autopilot
-			ctrl.CurrentPath = nil // clear path when toggling
-		}
+			if toggleAutopilot {
+				ctrl.Autopilot = !ctrl.Autopilot
+				ctrl.CurrentPath = nil // clear path when toggling
+			}
 
-		// Don't manually move if Autopilot is running
-		if ctrl.Autopilot || (dx == 0 && dy == 0) {
-			continue
-		}
+			// Don't manually move if Autopilot is running
+			if ctrl.Autopilot || (dx == 0 && dy == 0) {
+				continue
+			}
 
-		newX := pos.X + dx
-		newY := pos.Y + dy
+			newX := pos.X + dx
+			newY := pos.Y + dy
 
-		// ensure valid move
-		if newX >= 0 && newX < gameMap.Width && newY >= 0 && newY < gameMap.Height {
-			tile := gameMap.GetTile(newX, newY)
-			if tile != nil && tile.Walkable {
-				pos.X = newX
-				pos.Y = newY
+			// ensure valid move
+			if newX >= 0 && newX < gameMap.Width && newY >= 0 && newY < gameMap.Height {
+				tile := gameMap.GetTile(newX, newY)
+				if tile != nil && tile.Walkable {
+					pos.X = newX
+					pos.Y = newY
+				}
 			}
 		}
 	}

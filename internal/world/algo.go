@@ -6,12 +6,10 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/math"
 )
 
-// getLine uses Bresenham's Line Algorithm to return all points between A and B.
+// getLine uses Bresenham's Line Algorithm to call a function for all points between A and B.
 // Think of this as charting a laser beam or line-of-sight across your facility's floor grid.
 // Read more: https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-func getLine(x0, y0, x1, y1 int) []entity.Point {
-	var points []entity.Point
-
+func getLine(x0, y0, x1, y1 int, plot func(x, y int) bool) {
 	// Calculate the absolute distances between the start and end points.
 	// dx is the total horizontal distance.
 	dx := math.Abs(x1 - x0)
@@ -40,8 +38,10 @@ func getLine(x0, y0, x1, y1 int) []entity.Point {
 
 	// Enter the infinite loop to walk the grid, tile by tile.
 	for {
-		// Log the current coordinate. The terminal needs to know every single tile to light up.
-		points = append(points, entity.Point{X: x0, Y: y0})
+		// Call the plot function. If it returns false, we stop charting the line.
+		if !plot(x0, y0) {
+			break
+		}
 
 		// Check if we have reached the destination coordinates. If yes, terminate the loop.
 		if x0 == x1 && y0 == y1 {
@@ -65,9 +65,6 @@ func getLine(x0, y0, x1, y1 int) []entity.Point {
 			y0 += sy  // Take one step along the Y-axis.
 		}
 	}
-
-	// Return the complete charted path to the caller.
-	return points
 }
 
 // ManhattanDistance calculates the heuristic (H-Cost) without diagonal movement.
