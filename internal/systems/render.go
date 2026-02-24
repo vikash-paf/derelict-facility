@@ -29,7 +29,11 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map) {
 		// Is it the player? Check the mask for the PlayerControl bit
 		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
 
-		if !isPlayer {
+		// Check if it's an active generator
+		isGenerator := (w.Masks[i] & components.MaskPowerGenerator) != 0
+		isActiveGenerator := isGenerator && w.PowerGenerators[i].IsActive
+
+		if !isPlayer && !isActiveGenerator {
 			tile := gameMap.GetTile(pos.X, pos.Y)
 			if tile == nil || !tile.Visible {
 				continue

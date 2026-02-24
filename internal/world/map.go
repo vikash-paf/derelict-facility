@@ -7,6 +7,7 @@ import (
 type Map struct {
 	Tiles  []Tile
 	Rooms  []Rect
+	Doors  []entity.Point
 	Width  int
 	Height int
 }
@@ -50,9 +51,19 @@ func (m *Map) GetTile(x, y int) *Tile {
 	return &m.Tiles[x+y*m.Width]
 }
 
-func (m *Map) ComputeFOV(playerX, playerY int, radius int, blocksLight func(x, y int) bool) {
+func (m *Map) ComputeFOV(playerX, playerY int, radius int, blocksLight func(x, y int) bool, powerOn bool) {
 	for i := range m.Tiles {
-		m.Tiles[i].Visible = false
+		if powerOn {
+			m.Tiles[i].Visible = true
+			m.Tiles[i].Explored = true
+			m.Tiles[i].Distance = 0
+		} else {
+			m.Tiles[i].Visible = false
+		}
+	}
+
+	if powerOn {
+		return // The whole map is lit, no need to cast rays!
 	}
 
 	// clamp the bounding box so we stay inside the map

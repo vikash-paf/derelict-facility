@@ -115,11 +115,14 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
-	// Calculate FOV (We need to find the player's position first in an ECS)
+	powerOn := systems.IsPowerActive(e.EcsWorld)
+
+	// Calculate FOV
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
+
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
 				// 1. Is the map tile a wall?
 				if !e.Map.IsWalkable(x, y) {
@@ -127,7 +130,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 				}
 				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
-			})
+			}, powerOn)
 			break // Compute FOV for the first player found
 		}
 	}
@@ -180,6 +183,8 @@ func (e *Engine) renderPauseMenu() {
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	clear(e.PathLookup)
+
+	powerOn := systems.IsPowerActive(e.EcsWorld)
 
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
 	targetMask := components.MaskPlayerControl
@@ -267,11 +272,13 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				}
 
 				// Apply depth shading to the foreground color based on distance
-				if tile.Distance > 3 {
-					color = display.DarkenColor(color, 2)
-				}
-				if tile.Distance > 5 {
-					color = display.DarkenColor(color, 2)
+				if !powerOn {
+					if tile.Distance > 3 {
+						color = display.DarkenColor(color, 2)
+					}
+					if tile.Distance > 5 {
+						color = display.DarkenColor(color, 2)
+					}
 				}
 
 				e.Display.DrawText(x, y, char, color)

@@ -2,6 +2,8 @@ package world
 
 import (
 	"math/rand/v2"
+
+	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
 const (
@@ -119,8 +121,45 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	f.calculateWallBitmasks(m)
 
 	m.Rooms = rooms
+	m.Doors = f.findDoorways(m)
 
 	return m, playerX, playerY
+}
+
+func (f FacilityGenerator) findDoorways(m *Map) []entity.Point {
+	var doors []entity.Point
+	seen := make(map[entity.Point]bool)
+
+	for _, room := range m.Rooms {
+		// A room's perimeter is one tile outside its boundary
+		// Check top and bottom edges
+		for x := room.X1; x <= room.X2; x++ {
+			p1 := entity.Point{X: x, Y: room.Y1 - 1}
+			if m.IsWalkable(p1.X, p1.Y) && !seen[p1] {
+				seen[p1] = true
+				doors = append(doors, p1)
+			}
+			p2 := entity.Point{X: x, Y: room.Y2 + 1}
+			if m.IsWalkable(p2.X, p2.Y) && !seen[p2] {
+				seen[p2] = true
+				doors = append(doors, p2)
+			}
+		}
+		// Check left and right edges
+		for y := room.Y1; y <= room.Y2; y++ {
+			p1 := entity.Point{X: room.X1 - 1, Y: y}
+			if m.IsWalkable(p1.X, p1.Y) && !seen[p1] {
+				seen[p1] = true
+				doors = append(doors, p1)
+			}
+			p2 := entity.Point{X: room.X2 + 1, Y: y}
+			if m.IsWalkable(p2.X, p2.Y) && !seen[p2] {
+				seen[p2] = true
+				doors = append(doors, p2)
+			}
+		}
+	}
+	return doors
 }
 
 func (f FacilityGenerator) calculateWallBitmasks(m *Map) {

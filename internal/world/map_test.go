@@ -191,7 +191,7 @@ func TestComputeFOV(t *testing.T) {
 
 			m.ComputeFOV(tt.playerX, tt.playerY, tt.radius, func(x, y int) bool {
 				return !m.IsWalkable(x, y)
-			})
+			}, false)
 
 			// Visual Debug Output
 			t.Logf("\nTest: %s\nPlayer at (%d,%d), Radius: %d\n%s",

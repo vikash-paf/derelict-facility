@@ -22,7 +22,7 @@ func BenchmarkComputeFOV_SmallRadius(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m.ComputeFOV(40, 20, 5, func(x, y int) bool {
 			return !m.IsWalkable(x, y)
-		})
+		}, false)
 	}
 }
 
@@ -35,7 +35,7 @@ func BenchmarkComputeFOV_LargeRadius(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m.ComputeFOV(50, 50, 20, func(x, y int) bool {
 			return !m.IsWalkable(x, y)
-		})
+		}, false)
 	}
 }
 
