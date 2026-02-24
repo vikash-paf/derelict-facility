@@ -27,6 +27,15 @@ func (f *FacilityGenerator) randomBetween(min, max int) int {
 	return f.rng.IntN(spread) + min
 }
 
+func (f *FacilityGenerator) carveFloor(m *Map, x, y int) {
+	// 80% chance for a blank space, 20% chance for a random noise texture
+	variant := uint8(0)
+	if f.rng.IntN(10) < 2 {
+		variant = uint8(f.rng.IntN(4) + 1) // Variants 1 to 4
+	}
+	m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: variant})
+}
+
 func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	if width < roomMinSize || height < roomMinSize {
 		return nil, 0, 0
@@ -77,7 +86,7 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		// carve newRoom
 		for rx := newRoom.X1; rx <= newRoom.X2; rx++ {
 			for ry := newRoom.Y1; ry <= newRoom.Y2; ry++ {
-				m.SetTile(rx, ry, Tile{Type: TileTypeFloor, Walkable: true})
+				f.carveFloor(m, rx, ry)
 			}
 		}
 
@@ -119,7 +128,7 @@ func (f FacilityGenerator) createHorizontalCorridor(m *Map, x1, x2, y int) {
 		x1, x2 = x2, x1
 	}
 	for x := x1; x <= x2; x++ {
-		m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
+		f.carveFloor(m, x, y)
 	}
 }
 
@@ -129,6 +138,6 @@ func (f FacilityGenerator) createVerticalCorridor(m *Map, y1, y2, x int) {
 		y1, y2 = y2, y1
 	}
 	for y := y1; y <= y2; y++ {
-		m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true})
+		f.carveFloor(m, x, y)
 	}
 }

@@ -215,12 +215,46 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
 				char, color := display.ExtractTextAndColor(theme[tile.Type])
+
+				// Add texture to floors based on their Variant
+				if tile.Type == world.TileTypeFloor {
+					switch tile.Variant {
+					case 1:
+						char = "."
+					case 2:
+						char = ","
+					case 3:
+						char = "`"
+					case 4:
+						char = "'"
+					default:
+						char = " " // Empty space for most floors to reduce noise
+					}
+				}
+
 				e.Display.DrawText(x, y, char, color)
 				continue
 			}
 
 			if tile.Explored {
 				char, _ := display.ExtractTextAndColor(theme[tile.Type])
+
+				// Apply the same texture to explored floors
+				if tile.Type == world.TileTypeFloor {
+					switch tile.Variant {
+					case 1:
+						char = "."
+					case 2:
+						char = ","
+					case 3:
+						char = "`"
+					case 4:
+						char = "'"
+					default:
+						char = " "
+					}
+				}
+
 				e.Display.DrawText(x, y, char, display.MapANSIColor(world.Gray))
 				continue
 			}
