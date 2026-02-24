@@ -32,6 +32,9 @@ func main() {
 	seed := time.Now().UnixNano()
 	generator := world.NewFacilityGenerator(uint64(seed))
 	generatedMap, playerX, playerY := generator.Generate(mapWidth, mapHeight)
+	if generatedMap == nil {
+		panic("Failed to generate map")
+	}
 
 	// 3. Setup the ECS and spawn the Player
 	ecsWorld := ecs.NewWorld()
