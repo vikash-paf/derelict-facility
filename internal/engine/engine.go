@@ -283,7 +283,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			if tile.Explored {
-				char, _ := display.ExtractTextAndColor(theme[tile.Type])
+				char, color := display.ExtractTextAndColor(theme[tile.Type])
 
 				// Apply the same texture to explored floors
 				if tile.Type == world.TileTypeFloor {
@@ -332,7 +332,9 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 				}
 
-				e.Display.DrawText(x, y, char, display.MapANSIColor(world.Gray))
+				// Render explored tiles in a dimmed version of their theme color, not flat gray
+				dimColor := display.DarkenColor(color, 4)
+				e.Display.DrawText(x, y, char, dimColor)
 				continue
 			}
 
