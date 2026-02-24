@@ -137,6 +137,9 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	if rl.IsKeyPressed(rl.KeyQ) {
 		events = append(events, core.InputEvent{Key: core.KeyQ})
 	}
+	if rl.IsKeyPressed(rl.KeyE) {
+		events = append(events, core.InputEvent{Key: core.KeyE})
+	}
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		events = append(events, core.InputEvent{Key: core.KeyEsc})
 	}

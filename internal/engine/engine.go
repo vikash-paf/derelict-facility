@@ -230,17 +230,35 @@ func (e *Engine) renderHUD() {
 
 	statusText := "HEALTHY"
 	autopilotEngaged := false
+	var interactPrompt string // Store the prompt text if near an interactable
 
 	// Find player state for HUD
-	targetMask := components.MaskPlayerControl
+	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			ctrl := e.EcsWorld.PlayerControls[i]
+			pos := e.EcsWorld.Positions[i]
+
 			autopilotEngaged = ctrl.Autopilot
 			if ctrl.Status == components.PlayerStatusSick {
 				statusText = "SICK / TOXIC"
 			} else if ctrl.Status == components.PlayerStatusHurt {
 				statusText = "CRITICAL"
+			}
+
+			// Check for adjacent interactables
+			interactMask := components.MaskPosition | components.MaskInteractable
+			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
+				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
+					targetPos := e.EcsWorld.Positions[j]
+					dx := targetPos.X - pos.X
+					dy := targetPos.Y - pos.Y
+					if (dx*dx + dy*dy) <= 2 { // 1 tile away
+						interact := e.EcsWorld.Interactables[j]
+						interactPrompt = interact.Prompt
+						break
+					}
+				}
 			}
 			break
 		}
@@ -257,6 +275,13 @@ func (e *Engine) renderHUD() {
 	// %06d formats the integer to always be 6 digits (e.g., 000142)
 	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
 	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, world.White)
+
+	if interactPrompt != "" {
+		// Draw the prompt blinking above the HUD
+		if e.tickCount%30 < 15 {
+			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), world.Green)
+		}
+	}
 
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
 	e.drawText(2, hudY+2, controls, world.Gray)

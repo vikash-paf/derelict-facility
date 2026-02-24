@@ -23,9 +23,10 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
 func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map) {
-	// First analyze events to see if we pressed WASD or P
+	// First analyze events to see if we pressed WASD or P or E
 	dx, dy := 0, 0
 	toggleAutopilot := false
+	interactPressed := false
 
 	for _, event := range events {
 		switch event.Key {
@@ -39,6 +40,8 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 			dx = 1
 		case core.KeyP:
 			toggleAutopilot = true
+		case core.KeyE:
+			interactPressed = true
 		}
 	}
 
@@ -58,6 +61,11 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 				ctrl.CurrentPath = nil // clear path when toggling
 			}
 
+			if interactPressed {
+				// Find adjacent interactable entities
+				handleInteraction(w, pos.X, pos.Y)
+			}
+
 			// Don't manually move if Autopilot is running
 			if ctrl.Autopilot || (dx == 0 && dy == 0) {
 				continue
@@ -73,6 +81,42 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 					pos.X = newX
 					pos.Y = newY
 				}
+			}
+		}
+	}
+}
+
+func handleInteraction(w *ecs.World, playerX, playerY int) {
+	targetMask := components.MaskPosition | components.MaskInteractable
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (w.Masks[i] & targetMask) == targetMask {
+			pos := w.Positions[i]
+			// Check adjacency (including diagonals, or just orthogonal?)
+			// Orthogonal:
+			dx := pos.X - playerX
+			dy := pos.Y - playerY
+			distSq := dx*dx + dy*dy
+
+			if distSq <= 2 { // 1 tile away orthogonally (distSq=1) or diagonally (distSq=2) or same tile (0)
+				// It's interactable! What is it?
+				if (w.Masks[i] & components.MaskPowerGenerator) != 0 {
+					gen := &w.PowerGenerators[i]
+					gen.IsActive = !gen.IsActive
+
+					// Update visual feedback
+					if (w.Masks[i] & components.MaskGlyph) != 0 {
+						glyph := &w.Glyphs[i]
+						if gen.IsActive {
+							glyph.ColorCode = world.Green
+							glyph.Char = "⚡"
+						} else {
+							glyph.ColorCode = world.Red
+							glyph.Char = "X"
+						}
+					}
+				}
+				// Break after first successful interaction to prevent spamming
+				return
 			}
 		}
 	}
