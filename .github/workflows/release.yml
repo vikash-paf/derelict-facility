@@ -14,8 +14,8 @@ jobs:
           - goos: linux
             goarch: amd64
             binary_name: derelict_linux
-            cc: x86_64-pc-linux-gnu-gcc
-            cxx: x86_64-pc-linux-gnu-g++
+            cc: x86_64-unknown-linux-gnu-gcc
+            cxx: x86_64-unknown-linux-gnu-g++
           - goos: windows
             goarch: amd64
             binary_name: derelict_win.exe
@@ -44,8 +44,6 @@ jobs:
       - name: Install Cross-Compilers (macOS)
         run: |
           brew install mingw-w64
-          brew install FiloSottile/musl-cross/musl-cross --without-x86_64 --without-aarch64   # For standard linux cross compilation, or using a specific tap.
-          # Actually, the best way to cross-compile Linux from Mac is using a tap that provides x86_64-linux-gnu-gcc
           brew install messense/macos-cross-toolchains/x86_64-unknown-linux-gnu
 
       - name: Build Binary
