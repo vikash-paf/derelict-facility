@@ -26,10 +26,9 @@ func NewPathfinder(width, height int) *Pathfinder {
 	}
 }
 
-func (pf *Pathfinder) FindPath(m *Map, start, target entity.Point) []entity.Point {
+func (pf *Pathfinder) FindPath(m *Map, start, target entity.Point, isWalkable func(x, y int) bool) []entity.Point {
 	// 1. Initial Validation
-	targetTile := m.GetTile(target.X, target.Y)
-	if targetTile == nil || !targetTile.Walkable {
+	if !isWalkable(target.X, target.Y) {
 		return nil
 	}
 
@@ -66,9 +65,8 @@ func (pf *Pathfinder) FindPath(m *Map, start, target entity.Point) []entity.Poin
 		for i := 0; i < 4; i++ {
 			nx, ny := currentNode.Point.X+dx[i], currentNode.Point.Y+dy[i]
 
-			// Boundary and Walkability check using your existing GetTile logic
-			tile := m.GetTile(nx, ny)
-			if tile == nil || !tile.Walkable {
+			// Boundary and Walkability check using callback
+			if !isWalkable(nx, ny) {
 				continue
 			}
 

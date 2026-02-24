@@ -7,6 +7,20 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
+// IsSolidAt checks if any solid entity occupies the given coordinates.
+func IsSolidAt(w *ecs.World, x, y int) bool {
+	targetMask := components.MaskPosition | components.MaskSolid
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (w.Masks[i] & targetMask) == targetMask {
+			pos := w.Positions[i]
+			if pos.X == x && pos.Y == y {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
 func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map) {
 	// First analyze events to see if we pressed WASD or P
@@ -55,7 +69,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 			// ensure valid move
 			if newX >= 0 && newX < gameMap.Width && newY >= 0 && newY < gameMap.Height {
 				tile := gameMap.GetTile(newX, newY)
-				if tile != nil && tile.Walkable {
+				if tile != nil && tile.Walkable && !IsSolidAt(w, newX, newY) {
 					pos.X = newX
 					pos.Y = newY
 				}

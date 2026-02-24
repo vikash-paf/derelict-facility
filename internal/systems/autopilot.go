@@ -32,7 +32,14 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder) {
 				target := entity.Point{X: targetX, Y: targetY}
 
 				// Calculate the path
-				path := pf.FindPath(gameMap, start, target)
+				path := pf.FindPath(gameMap, start, target, func(x, y int) bool {
+					// 1. Is the map tile walkable?
+					if !gameMap.IsWalkable(x, y) {
+						return false
+					}
+					// 2. Is there a solid entity blocking the way?
+					return !IsSolidAt(w, x, y)
+				})
 
 				if len(path) > 1 {
 					ctrl.CurrentPath = path[1:]
@@ -45,7 +52,7 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder) {
 			// 2. Take the next step in the path
 			nextStep := ctrl.CurrentPath[0]
 
-			if gameMap.IsWalkable(nextStep.X, nextStep.Y) {
+			if gameMap.IsWalkable(nextStep.X, nextStep.Y) && !IsSolidAt(w, nextStep.X, nextStep.Y) {
 				pos.X = nextStep.X
 				pos.Y = nextStep.Y
 			} else {

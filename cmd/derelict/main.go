@@ -44,7 +44,15 @@ func main() {
 		Status:    components.PlayerStatusHealthy,
 	})
 
-	// 4. Hand everything to the Engine
+	// 5. Spawn a test Power Generator
+	genEnt := ecsWorld.CreateEntity()
+	ecsWorld.AddPosition(genEnt, components.Position{X: playerX + 2, Y: playerY})
+	ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", ColorCode: world.Red})
+	ecsWorld.AddSolid(genEnt)
+	ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+	ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{IsActive: false})
+
+	// 6. Hand everything to the Engine
 	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty)
 
 	err = gameEngine.Run()
