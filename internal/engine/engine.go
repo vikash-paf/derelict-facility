@@ -204,37 +204,12 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
 				char, color := display.ExtractTextAndColor(theme[tile.Type])
-
-				// Draw a continuous background block for walls to prevent gaps
-				if tile.Type == world.TileTypeWall {
-					bgColor := display.DarkenColor(color, 3) // Make the background 3x darker than the foreground text
-
-					// If using a full-block character, make the bg match exactly for a solid wall
-					if char == "█" || char == "▓" || char == "▒" || char == "░" {
-						bgColor = color
-					}
-
-					e.Display.DrawRect(x, y, bgColor)
-				}
-
 				e.Display.DrawText(x, y, char, color)
 				continue
 			}
 
 			if tile.Explored {
 				char, _ := display.ExtractTextAndColor(theme[tile.Type])
-
-				if tile.Type == world.TileTypeWall {
-					// Draw a very dark version for explored walls
-					bgColor := display.MapANSIColor(world.Gray)
-					bgColor = display.DarkenColor(bgColor, 3)
-
-					if char == "█" || char == "▓" || char == "▒" || char == "░" {
-						bgColor = display.MapANSIColor(world.Gray)
-					}
-					e.Display.DrawRect(x, y, bgColor)
-				}
-
 				e.Display.DrawText(x, y, char, display.MapANSIColor(world.Gray))
 				continue
 			}

@@ -84,17 +84,6 @@ func (r *RaylibDisplay) Clear(colorHex uint32) {
 	rl.ClearBackground(rl.GetColor(uint(colorHex)))
 }
 
-// DrawRect fills an entire grid cell with a solid color to prevent visual gaps.
-func (r *RaylibDisplay) DrawRect(gridX, gridY int, colorHex uint32) {
-	rl.DrawRectangle(
-		int32(gridX)*r.CellWidth,
-		int32(gridY)*r.CellHeight,
-		r.CellWidth,
-		r.CellHeight,
-		rl.GetColor(uint(colorHex)),
-	)
-}
-
 func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
 	pixelY := int32(gridY) * r.CellHeight
 
@@ -180,21 +169,4 @@ func ExtractTextAndColor(s string) (string, uint32) {
 	colorCode := s[:mIdx+1]
 	text := strings.ReplaceAll(s[mIdx+1:], world.Reset, "")
 	return text, MapANSIColor(colorCode)
-}
-
-// DarkenColor takes a hex color and reduces its brightness by the given factor.
-func DarkenColor(colorHex uint32, factor uint32) uint32 {
-	if factor <= 1 {
-		return colorHex
-	}
-	r := (colorHex >> 24) & 0xFF
-	g := (colorHex >> 16) & 0xFF
-	b := (colorHex >> 8) & 0xFF
-	a := colorHex & 0xFF
-
-	r = r / factor
-	g = g / factor
-	b = b / factor
-
-	return (r << 24) | (g << 16) | (b << 8) | a
 }

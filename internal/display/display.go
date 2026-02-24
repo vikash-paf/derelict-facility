@@ -11,7 +11,6 @@ type Display interface {
 	BeginFrame()
 	EndFrame()
 	Clear(colorHex uint32)
-	DrawRect(gridX, gridY int, colorHex uint32)
 	DrawText(gridX, gridY int, text string, colorHex uint32)
 	DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32)
 	PollInput() []core.InputEvent
