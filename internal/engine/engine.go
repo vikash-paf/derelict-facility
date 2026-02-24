@@ -193,7 +193,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "•", display.MapANSIColor(world.Red))
+				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
 				continue
 			}
 
