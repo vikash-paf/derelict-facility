@@ -154,9 +154,6 @@ func (e *Engine) render() {
 
 	// Determine active theme based on global states
 	activeTheme := e.BaseTheme
-	if !systems.IsPowerActive(e.EcsWorld) {
-		activeTheme = world.TileVariantDark
-	}
 
 	if e.State == GameStatePaused {
 		activeTheme = world.TileVariantPaused
