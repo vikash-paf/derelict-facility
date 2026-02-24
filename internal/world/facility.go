@@ -127,7 +127,7 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 }
 
 func (f FacilityGenerator) findDoorways(m *Map) []entity.Point {
-	var doors []entity.Point
+	var possibleDoors []entity.Point
 	seen := make(map[entity.Point]bool)
 
 	for _, room := range m.Rooms {
@@ -136,30 +136,53 @@ func (f FacilityGenerator) findDoorways(m *Map) []entity.Point {
 		for x := room.X1; x <= room.X2; x++ {
 			p1 := entity.Point{X: x, Y: room.Y1 - 1}
 			if m.IsWalkable(p1.X, p1.Y) && !seen[p1] {
-				seen[p1] = true
-				doors = append(doors, p1)
+				// Check if it's a 1-tile gap horizontally
+				if !m.IsWalkable(p1.X-1, p1.Y) && !m.IsWalkable(p1.X+1, p1.Y) {
+					seen[p1] = true
+					possibleDoors = append(possibleDoors, p1)
+				}
 			}
 			p2 := entity.Point{X: x, Y: room.Y2 + 1}
 			if m.IsWalkable(p2.X, p2.Y) && !seen[p2] {
-				seen[p2] = true
-				doors = append(doors, p2)
+				// Check if it's a 1-tile gap horizontally
+				if !m.IsWalkable(p2.X-1, p2.Y) && !m.IsWalkable(p2.X+1, p2.Y) {
+					seen[p2] = true
+					possibleDoors = append(possibleDoors, p2)
+				}
 			}
 		}
 		// Check left and right edges
 		for y := room.Y1; y <= room.Y2; y++ {
 			p1 := entity.Point{X: room.X1 - 1, Y: y}
 			if m.IsWalkable(p1.X, p1.Y) && !seen[p1] {
-				seen[p1] = true
-				doors = append(doors, p1)
+				// Check if it's a 1-tile gap vertically
+				if !m.IsWalkable(p1.X, p1.Y-1) && !m.IsWalkable(p1.X, p1.Y+1) {
+					seen[p1] = true
+					possibleDoors = append(possibleDoors, p1)
+				}
 			}
 			p2 := entity.Point{X: room.X2 + 1, Y: y}
 			if m.IsWalkable(p2.X, p2.Y) && !seen[p2] {
-				seen[p2] = true
-				doors = append(doors, p2)
+				// Check if it's a 1-tile gap vertically
+				if !m.IsWalkable(p2.X, p2.Y-1) && !m.IsWalkable(p2.X, p2.Y+1) {
+					seen[p2] = true
+					possibleDoors = append(possibleDoors, p2)
+				}
 			}
 		}
 	}
-	return doors
+
+	// Shuffle the possible doors and pick 2-3 at random
+	f.rng.Shuffle(len(possibleDoors), func(i, j int) {
+		possibleDoors[i], possibleDoors[j] = possibleDoors[j], possibleDoors[i]
+	})
+
+	numDoors := f.randomBetween(2, 3)
+	if len(possibleDoors) < numDoors {
+		numDoors = len(possibleDoors)
+	}
+
+	return possibleDoors[:numDoors]
 }
 
 func (f FacilityGenerator) calculateWallBitmasks(m *Map) {
