@@ -12,8 +12,8 @@ import (
 )
 
 func main() {
-	mapWidth, mapHeight := 80, 25
-	windowWidth, windowHeight := 80, 30
+	mapWidth, mapHeight := 129, 40
+	windowWidth, windowHeight := 120, 45
 
 	cellWidth := int32(10)
 	cellHeight := int32(20)

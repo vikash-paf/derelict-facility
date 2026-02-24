@@ -121,3 +121,16 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 		}
 	}
 }
+
+// IsPowerActive returns true if at least one generator is currently active
+func IsPowerActive(w *ecs.World) bool {
+	targetMask := components.MaskPowerGenerator
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (w.Masks[i] & targetMask) == targetMask {
+			if w.PowerGenerators[i].IsActive {
+				return true
+			}
+		}
+	}
+	return false
+}

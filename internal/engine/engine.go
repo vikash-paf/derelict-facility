@@ -28,7 +28,7 @@ type Engine struct {
 	Display    display.Display
 	Map        *world.Map
 	EcsWorld   *ecs.World // Replaces Player
-	Theme      world.TileVariant
+	BaseTheme  world.TileVariant
 	TickerRate time.Duration
 	tickCount  int
 	State      GameState
@@ -50,7 +50,7 @@ func NewEngine(
 		State:      GameStateRunning,
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
-		Theme:      startingTheme,
+		BaseTheme:  startingTheme,
 		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
 		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 	}
@@ -142,13 +142,17 @@ func (e *Engine) render() {
 	e.Display.BeginFrame()
 	e.Display.Clear(0x000000FF) // Black background
 
-	renderTheme := e.Theme
-
-	if e.State == GameStatePaused {
-		renderTheme = world.TileVariantPaused
+	// Determine active theme based on global states
+	activeTheme := e.BaseTheme
+	if !systems.IsPowerActive(e.EcsWorld) {
+		activeTheme = world.TileVariantDark
 	}
 
-	e.renderMapLayer(renderTheme)
+	if e.State == GameStatePaused {
+		activeTheme = world.TileVariantPaused
+	}
+
+	e.renderMapLayer(activeTheme)
 	systems.RenderEntities(e.EcsWorld, e.Display, e.Map)
 	e.renderHUD()
 
