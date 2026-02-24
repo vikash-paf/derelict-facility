@@ -232,6 +232,40 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 				}
 
+				// Apply auto-tiling to walls based on their Bitmask
+				if tile.Type == world.TileTypeWall {
+					// Check if we are using the "blueprint/connected" theme.
+					// We only auto-tile if the base character is an intersection/block type that makes sense to connect
+					if char == "╬" || char == "#" || char == "█" || char == "▓" {
+						switch tile.Bitmask {
+						case 0:
+							char = "O" // Pillar (no neighbors)
+						case 1, 4, 5:
+							char = "║" // Vertical (North, South, or Both)
+						case 2, 8, 10:
+							char = "═" // Horizontal (East, West, or Both)
+						case 3:
+							char = "╚" // North + East
+						case 6:
+							char = "╔" // East + South
+						case 12:
+							char = "╗" // South + West
+						case 9:
+							char = "╝" // West + North
+						case 7:
+							char = "╠" // North + East + South
+						case 14:
+							char = "╦" // East + South + West
+						case 13:
+							char = "╣" // South + West + North
+						case 11:
+							char = "╩" // West + North + East
+						case 15:
+							char = "╬" // All 4 directions
+						}
+					}
+				}
+
 				// Apply depth shading to the foreground color based on distance
 				if tile.Distance > 3 {
 					color = display.DarkenColor(color, 2)
@@ -260,6 +294,37 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 						char = "'"
 					default:
 						char = " "
+					}
+				}
+
+				if tile.Type == world.TileTypeWall {
+					if char == "╬" || char == "#" || char == "█" || char == "▓" {
+						switch tile.Bitmask {
+						case 0:
+							char = "O" // Pillar (no neighbors)
+						case 1, 4, 5:
+							char = "║" // Vertical (North, South, or Both)
+						case 2, 8, 10:
+							char = "═" // Horizontal (East, West, or Both)
+						case 3:
+							char = "╚" // North + East
+						case 6:
+							char = "╔" // East + South
+						case 12:
+							char = "╗" // South + West
+						case 9:
+							char = "╝" // West + North
+						case 7:
+							char = "╠" // North + East + South
+						case 14:
+							char = "╦" // East + South + West
+						case 13:
+							char = "╣" // South + West + North
+						case 11:
+							char = "╩" // West + North + East
+						case 15:
+							char = "╬" // All 4 directions
+						}
 					}
 				}
 

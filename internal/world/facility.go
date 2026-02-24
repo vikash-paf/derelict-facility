@@ -115,11 +115,48 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 	// 2. run the generation algorithm (l-Corridors algorithm, aka Procedural Dungeon Generator)
 	// 2.1 carve the rooms
 	// 2.2 connect the rooms (l-corridors)
-	// 3. return the map and the player position (center of the first room)
+	// 3. run auto-tiling calculation for all walls
+	f.calculateWallBitmasks(m)
 
 	m.Rooms = rooms
 
 	return m, playerX, playerY
+}
+
+func (f FacilityGenerator) calculateWallBitmasks(m *Map) {
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			tile := m.GetTile(x, y)
+			if tile == nil || tile.Type != TileTypeWall {
+				continue
+			}
+
+			var mask uint8 = 0
+
+			// North
+			tN := m.GetTile(x, y-1)
+			if tN != nil && tN.Type == TileTypeWall {
+				mask |= 1 // 0001
+			}
+			// East
+			tE := m.GetTile(x+1, y)
+			if tE != nil && tE.Type == TileTypeWall {
+				mask |= 2 // 0010
+			}
+			// South
+			tS := m.GetTile(x, y+1)
+			if tS != nil && tS.Type == TileTypeWall {
+				mask |= 4 // 0100
+			}
+			// West
+			tW := m.GetTile(x-1, y)
+			if tW != nil && tW.Type == TileTypeWall {
+				mask |= 8 // 1000
+			}
+
+			tile.Bitmask = mask
+		}
+	}
 }
 
 func (f FacilityGenerator) createHorizontalCorridor(m *Map, x1, x2, y int) {
