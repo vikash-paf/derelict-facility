@@ -10,35 +10,33 @@ import (
 // RenderEntities loops through all entities possessing BOTH a Sprite and Position component
 // and draws them to the active display buffer if they are within exactly visible map tiles.
 func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map) {
-	// A more robust ECS would have a function to get entities with multiple components,
-	// but for simplicity we iterate over one and check for the other.
-	entities := w.GetEntitiesWith(components.NameSprite)
-	for _, e := range entities {
-		renderRaw := w.GetComponent(e, components.NameSprite)
-		posRaw := w.GetComponent(e, components.NamePosition)
+	// The mask we care about: Must have BOTH a Sprite AND a Position
+	targetMask := components.MaskSprite | components.MaskPosition
 
-		if renderRaw == nil || posRaw == nil {
-			continue // Need both to draw!
-		}
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		// Does this entity index have all the required bits turned on?
+		if (w.Masks[i] & targetMask) == targetMask {
 
-		renderCfg := renderRaw.(*components.Sprite)
-		pos := posRaw.(*components.Position)
+			// Notice how clean this is? No type casting!
+			pos := w.Positions[i]
+			spr := w.Sprites[i]
 
-		// Respect the fog of war! Don't draw entities we can't see.
-		// Exception: the player themself should always be drawn, even if standing in a glitched dark tile
-		isPlayer := w.GetComponent(e, components.NamePlayerControl) != nil
-		if !isPlayer {
-			tile := gameMap.GetTile(pos.X, pos.Y)
-			if tile == nil || !tile.Visible {
-				continue
+			// Is it the player? Check the mask for the PlayerControl bit
+			isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+
+			if !isPlayer {
+				tile := gameMap.GetTile(pos.X, pos.Y)
+				if tile == nil || !tile.Visible {
+					continue
+				}
 			}
-		}
 
-		hexColor := uint32(0xFFFFFFFF)
-		if renderCfg.ColorCode != "" {
-			hexColor = display.MapANSIColor(renderCfg.ColorCode)
-		}
+			hexColor := uint32(0xFFFFFFFF)
+			if spr.ColorCode != "" {
+				hexColor = display.MapANSIColor(spr.ColorCode)
+			}
 
-		disp.DrawSprite(pos.X, pos.Y, renderCfg.SheetX, renderCfg.SheetY, hexColor)
+			disp.DrawSprite(pos.X, pos.Y, spr.SheetX, spr.SheetY, hexColor)
+		}
 	}
 }

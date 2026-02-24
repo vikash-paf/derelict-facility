@@ -4,11 +4,15 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
-// The Component Names as constants to prevent typos
+// ComponentMask is a bitmask representing the components an entity has.
+type ComponentMask uint32
+
+// Define a unique bit for every component type.
 const (
-	NamePosition      = "Position"
-	NameSprite        = "Sprite"
-	NamePlayerControl = "PlayerControl"
+	MaskNone          ComponentMask = 0
+	MaskPosition      ComponentMask = 1 << iota // 1 (001)
+	MaskSprite                                  // 2 (010)
+	MaskPlayerControl                           // 4 (100)
 )
 
 // PlayerStatus represents the health/condition of a player entity.

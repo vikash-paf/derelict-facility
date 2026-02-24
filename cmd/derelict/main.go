@@ -37,9 +37,9 @@ func main() {
 	ecsWorld := ecs.NewWorld()
 
 	playerEnt := ecsWorld.CreateEntity()
-	ecsWorld.AddComponent(playerEnt, components.NamePosition, &components.Position{X: playerX, Y: playerY})
-	ecsWorld.AddComponent(playerEnt, components.NameSprite, &components.Sprite{SheetX: 2, SheetY: 3, ColorCode: world.White}) // Astronaut Idle (Row 3, Column 3)
-	ecsWorld.AddComponent(playerEnt, components.NamePlayerControl, &components.PlayerControl{
+	ecsWorld.AddPosition(playerEnt, components.Position{X: playerX, Y: playerY})
+	ecsWorld.AddSprite(playerEnt, components.Sprite{SheetX: 2, SheetY: 3, ColorCode: world.White}) // Astronaut Idle (Row 3, Column 3)
+	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,
 	})

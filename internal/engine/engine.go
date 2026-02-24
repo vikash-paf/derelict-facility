@@ -112,11 +112,12 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	}
 
 	// Calculate FOV (We need to find the player's position first in an ECS)
-	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
-	if len(playerEntities) > 0 {
-		if posRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePosition); posRaw != nil {
-			pos := posRaw.(*components.Position)
+	targetMask := components.MaskPlayerControl | components.MaskPosition
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			pos := e.EcsWorld.Positions[i]
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius)
+			break // Compute FOV for the first player found
 		}
 	}
 }
@@ -166,10 +167,10 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	pathLookup := make(map[int]bool)
 
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
-	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
-	for _, ent := range playerEntities {
-		if ctrlRaw := e.EcsWorld.GetComponent(ent, components.NamePlayerControl); ctrlRaw != nil {
-			ctrl := ctrlRaw.(*components.PlayerControl)
+	targetMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			ctrl := e.EcsWorld.PlayerControls[i]
 			if ctrl.Autopilot {
 				for _, p := range ctrl.CurrentPath {
 					pathLookup[p.Y*e.Map.Width+p.X] = true
@@ -238,16 +239,17 @@ func (e *Engine) renderHUD() {
 	autopilotEngaged := false
 
 	// Find player state for HUD
-	playerEntities := e.EcsWorld.GetEntitiesWith(components.NamePlayerControl)
-	if len(playerEntities) > 0 {
-		if ctrlRaw := e.EcsWorld.GetComponent(playerEntities[0], components.NamePlayerControl); ctrlRaw != nil {
-			ctrl := ctrlRaw.(*components.PlayerControl)
+	targetMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			ctrl := e.EcsWorld.PlayerControls[i]
 			autopilotEngaged = ctrl.Autopilot
 			if ctrl.Status == components.PlayerStatusSick {
 				statusText = "SICK / TOXIC"
 			} else if ctrl.Status == components.PlayerStatusHurt {
 				statusText = "CRITICAL"
 			}
+			break
 		}
 	}
 
