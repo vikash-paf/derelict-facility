@@ -15,9 +15,9 @@ func main() {
 	mapWidth, mapHeight := 80, 45
 	windowWidth, windowHeight := 80, 50
 
-	cellWidth := int32(16)
-	cellHeight := int32(16)
-	fontSize := int32(16)
+	cellWidth := int32(10)
+	cellHeight := int32(20)
+	fontSize := int32(20)
 	fontPath := "assets/fonts/FiraCodeNFBoldMono.ttf"
 
 	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize, fontPath)
