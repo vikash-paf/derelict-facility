@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/display"
@@ -29,7 +28,8 @@ func main() {
 	defer disp.Close()
 
 	// 2. Build the world map FIRST
-	seed := time.Now().UnixNano()
+	// seed := time.Now().UnixNano()
+	seed := 12345
 	generator := world.NewFacilityGenerator(uint64(seed))
 	generatedMap, playerX, playerY := generator.Generate(mapWidth, mapHeight)
 	if generatedMap == nil {
