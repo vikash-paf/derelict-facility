@@ -99,7 +99,9 @@ func TestCastRay(t *testing.T) {
 			m := newTestMap(layout)
 
 			// Fire the ray
-			m.castRay(tt.x0, tt.y0, tt.x1, tt.y1)
+			m.castRay(tt.x0, tt.y0, tt.x1, tt.y1, func(x, y int) bool {
+				return !m.IsWalkable(x, y)
+			})
 
 			// Log the visual state for inspection on failure or -v
 			t.Logf("\nTest: %s (Map: %s)\nRay: (%d,%d) -> (%d,%d)\n%s",
@@ -187,7 +189,9 @@ func TestComputeFOV(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newTestMap(layouts[tt.layoutName])
 
-			m.ComputeFOV(tt.playerX, tt.playerY, tt.radius)
+			m.ComputeFOV(tt.playerX, tt.playerY, tt.radius, func(x, y int) bool {
+				return !m.IsWalkable(x, y)
+			})
 
 			// Visual Debug Output
 			t.Logf("\nTest: %s\nPlayer at (%d,%d), Radius: %d\n%s",

@@ -120,7 +120,14 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
-			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius)
+			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
+				// 1. Is the map tile a wall?
+				if !e.Map.IsWalkable(x, y) {
+					return true
+				}
+				// 2. Is there a Solid entity (like a closed door)?
+				return systems.IsSolidAt(e.EcsWorld, x, y)
+			})
 			break // Compute FOV for the first player found
 		}
 	}

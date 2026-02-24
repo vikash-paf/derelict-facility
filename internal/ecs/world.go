@@ -23,6 +23,7 @@ type World struct {
 	Glyphs          [MaxEntities]components.Glyph
 	Interactables   [MaxEntities]components.Interactable
 	PowerGenerators [MaxEntities]components.PowerGenerator
+	Doors           [MaxEntities]components.Door
 }
 
 func NewWorld() *World {
@@ -80,6 +81,10 @@ func (w *World) AddSolid(e Entity) {
 	w.Masks[e] |= components.MaskSolid // No data to store, just set the flag!
 }
 
+func (w *World) RemoveSolid(e Entity) {
+	w.Masks[e] &^= components.MaskSolid // Unset the flag
+}
+
 func (w *World) AddInteractable(e Entity, interactable components.Interactable) {
 	w.Interactables[e] = interactable
 	w.Masks[e] |= components.MaskInteractable
@@ -88,4 +93,9 @@ func (w *World) AddInteractable(e Entity, interactable components.Interactable) 
 func (w *World) AddPowerGenerator(e Entity, gen components.PowerGenerator) {
 	w.PowerGenerators[e] = gen
 	w.Masks[e] |= components.MaskPowerGenerator
+}
+
+func (w *World) AddDoor(e Entity, door components.Door) {
+	w.Doors[e] = door
+	w.Masks[e] |= components.MaskDoor
 }

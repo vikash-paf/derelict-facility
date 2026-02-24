@@ -85,6 +85,16 @@ func (r *RaylibDisplay) Clear(colorHex uint32) {
 	rl.ClearBackground(rl.GetColor(uint(colorHex)))
 }
 
+func (r *RaylibDisplay) DrawRect(gridX, gridY int, colorHex uint32) {
+	rl.DrawRectangle(
+		int32(gridX)*r.CellWidth,
+		int32(gridY)*r.CellHeight,
+		r.CellWidth,
+		r.CellHeight,
+		rl.GetColor(uint(colorHex)),
+	)
+}
+
 func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
 	pixelY := int32(gridY) * r.CellHeight
 

@@ -17,6 +17,7 @@ const (
 	MaskSolid                                    // 16
 	MaskInteractable                             // 32
 	MaskPowerGenerator                           // 64
+	MaskDoor                                     // 128
 )
 
 // PlayerStatus represents the health/condition of a player entity.
@@ -68,4 +69,9 @@ type Interactable struct {
 // PowerGenerator is a specific interactive device state.
 type PowerGenerator struct {
 	IsActive bool
+}
+
+// Door represents a mechanism that can block movement and vision.
+type Door struct {
+	IsOpen bool
 }

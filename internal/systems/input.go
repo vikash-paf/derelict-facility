@@ -98,7 +98,9 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 			distSq := dx*dx + dy*dy
 
 			if distSq <= 2 { // 1 tile away orthogonally (distSq=1) or diagonally (distSq=2) or same tile (0)
-				// It's interactable! What is it?
+				// What kind of interactable is it?
+
+				// 1. Power Generator
 				if (w.Masks[i] & components.MaskPowerGenerator) != 0 {
 					gen := &w.PowerGenerators[i]
 					gen.IsActive = !gen.IsActive
@@ -114,9 +116,33 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 							glyph.Char = "X"
 						}
 					}
+					return // Stop after interacting
 				}
-				// Break after first successful interaction to prevent spamming
-				return
+
+				// 2. Door
+				if (w.Masks[i] & components.MaskDoor) != 0 {
+					door := &w.Doors[i]
+					door.IsOpen = !door.IsOpen
+
+					if door.IsOpen {
+						// Open the door
+						w.RemoveSolid(i)
+						w.Interactables[i].Prompt = "Press [E] to Close Door"
+						if (w.Masks[i] & components.MaskGlyph) != 0 {
+							w.Glyphs[i].Char = "/"
+							w.Glyphs[i].ColorCode = world.Gray
+						}
+					} else {
+						// Close the door
+						w.AddSolid(i)
+						w.Interactables[i].Prompt = "Press [E] to Open Door"
+						if (w.Masks[i] & components.MaskGlyph) != 0 {
+							w.Glyphs[i].Char = "+"
+							w.Glyphs[i].ColorCode = world.White
+						}
+					}
+					return // Stop after interacting
+				}
 			}
 		}
 	}
