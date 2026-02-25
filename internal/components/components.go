@@ -9,15 +9,15 @@ type ComponentMask uint32
 
 // Define a unique bit for every component type.
 const (
-	MaskNone           ComponentMask = 0
-	MaskPosition       ComponentMask = 1 << iota // 1 (001)
-	MaskSprite                                   // 2 (010)
-	MaskPlayerControl                            // 4 (100)
-	MaskGlyph                                    // 8
-	MaskSolid                                    // 16
-	MaskInteractable                             // 32
-	MaskPowerGenerator                           // 64
-	MaskDoor                                     // 128
+	MaskNone     ComponentMask = 0
+	MaskPosition ComponentMask = 1 << iota
+	MaskSprite
+	MaskPlayerControl
+	MaskGlyph
+	MaskSolid
+	MaskInteractable
+	MaskPowerGenerator
+	MaskDoor
 )
 
 // PlayerStatus represents the health/condition of a player entity.
