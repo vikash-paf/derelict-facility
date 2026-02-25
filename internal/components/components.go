@@ -23,6 +23,12 @@ const (
 // PlayerStatus represents the health/condition of a player entity.
 type PlayerStatus uint8
 
+const (
+	PlayerStatusHealthy PlayerStatus = iota
+	PlayerStatusSick
+	PlayerStatusHurt
+)
+
 func (s PlayerStatus) Title() string {
 	switch s {
 	case PlayerStatusHealthy:
@@ -35,12 +41,6 @@ func (s PlayerStatus) Title() string {
 		return "Unknown"
 	}
 }
-
-const (
-	PlayerStatusHealthy PlayerStatus = iota
-	PlayerStatusSick
-	PlayerStatusHurt
-)
 
 // Position holds exactly where an Entity is on the grid.
 type Position struct {
