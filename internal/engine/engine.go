@@ -362,23 +362,19 @@ func (e *Engine) renderHUD() {
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
-			ctrl := e.EcsWorld.PlayerControls[i]
-			pos := e.EcsWorld.Positions[i]
+			control := e.EcsWorld.PlayerControls[i]
+			position := e.EcsWorld.Positions[i]
 
-			autopilotEngaged = ctrl.Autopilot
-			if ctrl.Status == components.PlayerStatusSick {
-				statusText = "SICK / TOXIC"
-			} else if ctrl.Status == components.PlayerStatusHurt {
-				statusText = "CRITICAL"
-			}
+			autopilotEngaged = control.Autopilot
+			statusText = control.Status.Title()
 
 			// Check for adjacent interactables
 			interactMask := components.MaskPosition | components.MaskInteractable
 			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
 				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
 					targetPos := e.EcsWorld.Positions[j]
-					dx := targetPos.X - pos.X
-					dy := targetPos.Y - pos.Y
+					dx := targetPos.X - position.X
+					dy := targetPos.Y - position.Y
 					if (dx*dx + dy*dy) <= 2 { // 1 tile away
 						interact := e.EcsWorld.Interactables[j]
 						interactPrompt = interact.Prompt
@@ -386,6 +382,7 @@ func (e *Engine) renderHUD() {
 					}
 				}
 			}
+
 			break
 		}
 	}

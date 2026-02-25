@@ -23,6 +23,19 @@ const (
 // PlayerStatus represents the health/condition of a player entity.
 type PlayerStatus uint8
 
+func (s PlayerStatus) Title() string {
+	switch s {
+	case PlayerStatusHealthy:
+		return "Healthy"
+	case PlayerStatusSick:
+		return "SICK / TOXIC"
+	case PlayerStatusHurt:
+		return "Hurt"
+	default:
+		return "Unknown"
+	}
+}
+
 const (
 	PlayerStatusHealthy PlayerStatus = iota
 	PlayerStatusSick
