@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
@@ -81,16 +82,12 @@ func (e *Engine) Run() error {
 
 func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 	for _, event := range events {
-		if event.Quit || event.Key == core.KeyQ {
+		if event.Quit || event.Key == rl.KeyQ {
 			e.Running = false
 			return
 		}
-		if event.Key == core.KeyEsc { // Escape
-			if e.State == GameStateRunning {
-				e.State = GameStatePaused
-			} else {
-				e.State = GameStateRunning
-			}
+		if event.Key == rl.KeyEscape {
+			e.State = e.State.Flip()
 		}
 	}
 }
