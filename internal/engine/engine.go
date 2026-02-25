@@ -24,6 +24,11 @@ const (
 	GameStateRunning
 )
 
+// Flip the game state without branching, so it's a bit faster than using a switch statement.
+func (s GameState) Flip() GameState {
+	return s ^ 1
+}
+
 type Engine struct {
 	Display    display.Display
 	Map        *world.Map
