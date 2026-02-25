@@ -24,7 +24,6 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
 func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map) {
-	// First analyze events to see if we pressed WASD or P or E
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -50,37 +49,33 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (w.Masks[i] & targetMask) == targetMask {
-
-			// IMPORTANT: In Go, if we want to modify the struct inside the array,
-			// we must use a pointer to the array index!
-			// If we did `ctrl := w.PlayerControls[i]`, we'd be modifying a copy.
-			ctrl := &w.PlayerControls[i]
-			pos := &w.Positions[i]
+			controls := &w.PlayerControls[i]
+			positions := &w.Positions[i]
 
 			if toggleAutopilot {
-				ctrl.Autopilot = !ctrl.Autopilot
-				ctrl.CurrentPath = nil // clear path when toggling
+				controls.Autopilot = !controls.Autopilot
+				controls.CurrentPath = nil // clear path when toggling
 			}
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, pos.X, pos.Y)
+				handleInteraction(w, positions.X, positions.Y)
 			}
 
 			// Don't manually move if Autopilot is running
-			if ctrl.Autopilot || (dx == 0 && dy == 0) {
+			if controls.Autopilot || (dx == 0 && dy == 0) {
 				continue
 			}
 
-			newX := pos.X + dx
-			newY := pos.Y + dy
+			newX := positions.X + dx
+			newY := positions.Y + dy
 
 			// ensure valid move
 			if newX >= 0 && newX < gameMap.Width && newY >= 0 && newY < gameMap.Height {
 				tile := gameMap.GetTile(newX, newY)
 				if tile != nil && tile.Walkable && !IsSolidAt(w, newX, newY) {
-					pos.X = newX
-					pos.Y = newY
+					positions.X = newX
+					positions.Y = newY
 				}
 			}
 		}
