@@ -130,29 +130,30 @@ func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHe
 
 func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	var events []core.InputEvent
+
 	if rl.IsKeyPressed(rl.KeyW) || rl.IsKeyPressedRepeat(rl.KeyW) {
-		events = append(events, core.InputEvent{Key: core.KeyW})
+		events = append(events, core.InputEvent{Key: rl.KeyW})
 	}
 	if rl.IsKeyPressed(rl.KeyS) || rl.IsKeyPressedRepeat(rl.KeyS) {
-		events = append(events, core.InputEvent{Key: core.KeyS})
+		events = append(events, core.InputEvent{Key: rl.KeyS})
 	}
 	if rl.IsKeyPressed(rl.KeyA) || rl.IsKeyPressedRepeat(rl.KeyA) {
-		events = append(events, core.InputEvent{Key: core.KeyA})
+		events = append(events, core.InputEvent{Key: rl.KeyA})
 	}
 	if rl.IsKeyPressed(rl.KeyD) || rl.IsKeyPressedRepeat(rl.KeyD) {
-		events = append(events, core.InputEvent{Key: core.KeyD})
+		events = append(events, core.InputEvent{Key: rl.KeyD})
 	}
 	if rl.IsKeyPressed(rl.KeyP) {
-		events = append(events, core.InputEvent{Key: core.KeyP})
+		events = append(events, core.InputEvent{Key: rl.KeyP})
 	}
 	if rl.IsKeyPressed(rl.KeyQ) {
-		events = append(events, core.InputEvent{Key: core.KeyQ})
+		events = append(events, core.InputEvent{Key: rl.KeyQ})
 	}
 	if rl.IsKeyPressed(rl.KeyE) {
-		events = append(events, core.InputEvent{Key: core.KeyE})
+		events = append(events, core.InputEvent{Key: rl.KeyE})
 	}
 	if rl.IsKeyPressed(rl.KeyEscape) {
-		events = append(events, core.InputEvent{Key: core.KeyEsc})
+		events = append(events, core.InputEvent{Key: rl.KeyEscape})
 	}
 	return events
 }
