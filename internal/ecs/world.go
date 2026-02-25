@@ -24,6 +24,7 @@ type World struct {
 	Interactables   [MaxEntities]components.Interactable
 	PowerGenerators [MaxEntities]components.PowerGenerator
 	Doors           [MaxEntities]components.Door
+	Terminals       [MaxEntities]components.Terminal
 }
 
 func NewWorld() *World {
@@ -98,4 +99,15 @@ func (w *World) AddPowerGenerator(e Entity, gen components.PowerGenerator) {
 func (w *World) AddDoor(e Entity, door components.Door) {
 	w.Doors[e] = door
 	w.Masks[e] |= components.MaskDoor
+}
+
+// AddTerminal adds a Terminal component to an entity.
+func (w *World) AddTerminal(entity Entity, terminal components.Terminal) {
+	w.Masks[entity] |= components.MaskTerminal
+	w.Terminals[entity] = terminal
+}
+
+// RemoveTerminal removes the Terminal component from an entity.
+func (w *World) RemoveTerminal(entity Entity) {
+	w.Masks[entity] &^= components.MaskTerminal
 }

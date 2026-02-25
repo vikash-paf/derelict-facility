@@ -1,6 +1,7 @@
 package systems
 
 import (
+	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
@@ -23,24 +24,23 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
 func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map) {
-	// First analyze events to see if we pressed WASD or P or E
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
 
 	for _, event := range events {
 		switch event.Key {
-		case core.KeyW:
+		case rl.KeyW:
 			dy = -1
-		case core.KeyS:
+		case rl.KeyS:
 			dy = 1
-		case core.KeyA:
+		case rl.KeyA:
 			dx = -1
-		case core.KeyD:
+		case rl.KeyD:
 			dx = 1
-		case core.KeyP:
+		case rl.KeyP:
 			toggleAutopilot = true
-		case core.KeyE:
+		case rl.KeyE:
 			interactPressed = true
 		}
 	}
@@ -49,37 +49,33 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (w.Masks[i] & targetMask) == targetMask {
-
-			// IMPORTANT: In Go, if we want to modify the struct inside the array,
-			// we must use a pointer to the array index!
-			// If we did `ctrl := w.PlayerControls[i]`, we'd be modifying a copy.
-			ctrl := &w.PlayerControls[i]
-			pos := &w.Positions[i]
+			controls := &w.PlayerControls[i]
+			positions := &w.Positions[i]
 
 			if toggleAutopilot {
-				ctrl.Autopilot = !ctrl.Autopilot
-				ctrl.CurrentPath = nil // clear path when toggling
+				controls.Autopilot = !controls.Autopilot
+				controls.CurrentPath = nil // clear path when toggling
 			}
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, pos.X, pos.Y)
+				handleInteraction(w, positions.X, positions.Y)
 			}
 
 			// Don't manually move if Autopilot is running
-			if ctrl.Autopilot || (dx == 0 && dy == 0) {
+			if controls.Autopilot || (dx == 0 && dy == 0) {
 				continue
 			}
 
-			newX := pos.X + dx
-			newY := pos.Y + dy
+			newX := positions.X + dx
+			newY := positions.Y + dy
 
 			// ensure valid move
 			if newX >= 0 && newX < gameMap.Width && newY >= 0 && newY < gameMap.Height {
 				tile := gameMap.GetTile(newX, newY)
 				if tile != nil && tile.Walkable && !IsSolidAt(w, newX, newY) {
-					pos.X = newX
-					pos.Y = newY
+					positions.X = newX
+					positions.Y = newY
 				}
 			}
 		}
@@ -109,10 +105,10 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 					if (w.Masks[i] & components.MaskGlyph) != 0 {
 						glyph := &w.Glyphs[i]
 						if gen.IsActive {
-							glyph.ColorCode = world.Green
+							glyph.Color = core.Green
 							glyph.Char = "⚡"
 						} else {
-							glyph.ColorCode = world.Red
+							glyph.Color = core.Red
 							glyph.Char = "X"
 						}
 					}
@@ -130,7 +126,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 						w.Interactables[i].Prompt = "Press [E] to Close Door"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Char = "/"
-							w.Glyphs[i].ColorCode = world.Gray
+							w.Glyphs[i].Color = core.Gray
 						}
 					} else {
 						// Close the door
@@ -138,7 +134,20 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 						w.Interactables[i].Prompt = "Press [E] to Open Door"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Char = "+"
-							w.Glyphs[i].ColorCode = world.White
+							w.Glyphs[i].Color = core.White
+						}
+					}
+					return // Stop after interacting
+				}
+
+				// 3. Terminal
+				if (w.Masks[i] & components.MaskTerminal) != 0 {
+					terminal := &w.Terminals[i]
+					if !terminal.HasSaved {
+						terminal.HasSaved = true
+						w.Interactables[i].Prompt = "[ CHECKPOINT SAVED ]"
+						if (w.Masks[i] & components.MaskGlyph) != 0 {
+							w.Glyphs[i].Color = core.Green
 						}
 					}
 					return // Stop after interacting

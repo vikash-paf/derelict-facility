@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
@@ -23,6 +24,11 @@ const (
 	GameStatePaused GameState = iota
 	GameStateRunning
 )
+
+// Flip the game state without branching, so it's a bit faster than using a switch statement.
+func (s GameState) Flip() GameState {
+	return s ^ 1
+}
 
 type Engine struct {
 	Display    display.Display
@@ -76,16 +82,12 @@ func (e *Engine) Run() error {
 
 func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 	for _, event := range events {
-		if event.Quit || event.Key == core.KeyQ {
+		if event.Quit || event.Key == rl.KeyQ {
 			e.Running = false
 			return
 		}
-		if event.Key == core.KeyEsc { // Escape
-			if e.State == GameStateRunning {
-				e.State = GameStatePaused
-			} else {
-				e.State = GameStateRunning
-			}
+		if event.Key == rl.KeyEscape {
+			e.State = e.State.Flip()
 		}
 	}
 }
@@ -111,7 +113,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map)
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
-	if e.tickCount%2 == 0 {
+	if e.tickCount%6 == 0 {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
@@ -150,7 +152,7 @@ func (e *Engine) Resume() {
 // Renders top to bottom as separate layers.
 func (e *Engine) render() {
 	e.Display.BeginFrame()
-	e.Display.Clear(0x000000FF) // Black background
+	e.Display.Clear(core.Black) // Black background
 
 	// Determine active theme based on global states
 	activeTheme := e.BaseTheme
@@ -173,9 +175,9 @@ func (e *Engine) render() {
 }
 
 func (e *Engine) renderPauseMenu() {
-	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", world.Red)
-	e.drawTextCentered(16, "Press [ESC] to Resume", world.White)
-	e.drawTextCentered(17, "Press [Q] to Quit", world.Gray)
+	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", core.Red)
+	e.drawTextCentered(16, "Press [ESC] to Resume", core.White)
+	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
 }
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
@@ -206,7 +208,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
+				e.Display.DrawText(x, y, "*", core.Red)
 				continue
 			}
 
@@ -216,7 +218,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 
 			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
-				char, color := display.ExtractTextAndColor(theme[tile.Type])
+				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
 				// Add texture to floors based on their Variant
 				if tile.Type == world.TileTypeFloor {
@@ -283,7 +285,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			if tile.Explored {
-				char, color := display.ExtractTextAndColor(theme[tile.Type])
+				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
 				// Apply the same texture to explored floors
 				if tile.Type == world.TileTypeFloor {
@@ -350,7 +352,7 @@ func (e *Engine) renderHUD() {
 
 	// strings.Repeat is a highly optimized Go standard library function
 	divider := strings.Repeat("═", e.Map.Width)
-	e.drawText(0, hudY, divider, world.Gray)
+	e.drawText(0, hudY, divider, core.Gray)
 
 	statusText := "HEALTHY"
 	autopilotEngaged := false
@@ -360,23 +362,19 @@ func (e *Engine) renderHUD() {
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
-			ctrl := e.EcsWorld.PlayerControls[i]
-			pos := e.EcsWorld.Positions[i]
+			control := e.EcsWorld.PlayerControls[i]
+			position := e.EcsWorld.Positions[i]
 
-			autopilotEngaged = ctrl.Autopilot
-			if ctrl.Status == components.PlayerStatusSick {
-				statusText = "SICK / TOXIC"
-			} else if ctrl.Status == components.PlayerStatusHurt {
-				statusText = "CRITICAL"
-			}
+			autopilotEngaged = control.Autopilot
+			statusText = control.Status.Title()
 
 			// Check for adjacent interactables
 			interactMask := components.MaskPosition | components.MaskInteractable
 			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
 				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
 					targetPos := e.EcsWorld.Positions[j]
-					dx := targetPos.X - pos.X
-					dy := targetPos.Y - pos.Y
+					dx := targetPos.X - position.X
+					dy := targetPos.Y - position.Y
 					if (dx*dx + dy*dy) <= 2 { // 1 tile away
 						interact := e.EcsWorld.Interactables[j]
 						interactPrompt = interact.Prompt
@@ -384,47 +382,46 @@ func (e *Engine) renderHUD() {
 					}
 				}
 			}
+
 			break
 		}
 	}
 
-	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), world.Cyan)
+	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
 
 	if autopilotEngaged {
-		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", world.Red)
+		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
 	} else {
-		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", world.Gray)
+		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
 	// %06d formats the integer to always be 6 digits (e.g., 000142)
 	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
-	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, world.White)
+	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, core.White)
 
 	if interactPrompt != "" {
 		// Draw the prompt blinking above the HUD
 		if e.tickCount%30 < 15 {
-			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), world.Green)
+			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), core.Green)
 		}
 	}
 
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
-	e.drawText(2, hudY+2, controls, world.Gray)
+	e.drawText(2, hudY+2, controls, core.Gray)
 }
 
-func (e *Engine) drawTextCentered(y int, text string, colorCode string) {
+func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
 	centerX := e.Map.Width / 2
 	halfText := len(text) / 2
 	x := centerX - halfText
 
-	textStr, _ := display.ExtractTextAndColor(text)
-	colorHex := display.MapANSIColor(colorCode)
+	
 
-	e.Display.DrawText(x, y, textStr, colorHex)
+	e.Display.DrawText(x, y, text, color)
 }
 
-func (e *Engine) drawText(x, y int, text string, colorCode string) {
-	textStr, _ := display.ExtractTextAndColor(text)
-	colorHex := display.MapANSIColor(colorCode)
+func (e *Engine) drawText(x, y int, text string, color core.Color) {
+	
 
-	e.Display.DrawText(x, y, textStr, colorHex)
+	e.Display.DrawText(x, y, text, color)
 }

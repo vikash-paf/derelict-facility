@@ -1,6 +1,7 @@
 package components
 
 import (
+	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
@@ -9,15 +10,16 @@ type ComponentMask uint32
 
 // Define a unique bit for every component type.
 const (
-	MaskNone           ComponentMask = 0
-	MaskPosition       ComponentMask = 1 << iota // 1 (001)
-	MaskSprite                                   // 2 (010)
-	MaskPlayerControl                            // 4 (100)
-	MaskGlyph                                    // 8
-	MaskSolid                                    // 16
-	MaskInteractable                             // 32
-	MaskPowerGenerator                           // 64
-	MaskDoor                                     // 128
+	MaskNone     ComponentMask = 0
+	MaskPosition ComponentMask = 1 << iota
+	MaskSprite
+	MaskPlayerControl
+	MaskGlyph
+	MaskSolid
+	MaskInteractable
+	MaskPowerGenerator
+	MaskDoor
+	MaskTerminal
 )
 
 // PlayerStatus represents the health/condition of a player entity.
@@ -29,6 +31,19 @@ const (
 	PlayerStatusHurt
 )
 
+func (s PlayerStatus) Title() string {
+	switch s {
+	case PlayerStatusHealthy:
+		return "Healthy"
+	case PlayerStatusSick:
+		return "SICK / TOXIC"
+	case PlayerStatusHurt:
+		return "Hurt"
+	default:
+		return "Unknown"
+	}
+}
+
 // Position holds exactly where an Entity is on the grid.
 type Position struct {
 	X int
@@ -39,9 +54,9 @@ type Position struct {
 // SheetX and SheetY represent the zero-indexed grid coordinates on the tileset image.
 // e.g., SheetX: 0, SheetY: 0 is the top-left tile on the PNG.
 type Sprite struct {
-	SheetX    int
-	SheetY    int
-	ColorCode string // To optionally colorize or tint the sprite
+	SheetX int
+	SheetY int
+	Color  core.Color // To optionally colorize or tint the sprite
 }
 
 // PlayerControl indicates that this entity is currently controllable by the user.
@@ -54,8 +69,8 @@ type PlayerControl struct {
 
 // Glyph defines the graphical representation of an entity using a text character or emoji.
 type Glyph struct {
-	Char      string
-	ColorCode string // ANSI color code
+	Char  string
+	Color core.Color // RGBA color
 }
 
 // Solid indicates this entity cannot be walked through.
@@ -75,3 +90,9 @@ type PowerGenerator struct {
 type Door struct {
 	IsOpen bool
 }
+
+// Terminal allows saving the game.
+type Terminal struct {
+	HasSaved bool
+}
+

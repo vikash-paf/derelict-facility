@@ -1,11 +1,8 @@
 package display
 
 import (
-	"strings"
-
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/vikash-paf/derelict-facility/internal/core"
-	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
 type RaylibDisplay struct {
@@ -38,7 +35,7 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		for i := int32(32); i <= 126; i++ {
 			fontChars = append(fontChars, rune(i))
 		}
-		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', '👷'}
+		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', '👷', '🖥'}
 		fontChars = append(fontChars, extraChars...)
 
 		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
@@ -81,21 +78,21 @@ func (r *RaylibDisplay) EndFrame() {
 	rl.EndDrawing()
 }
 
-func (r *RaylibDisplay) Clear(colorHex uint32) {
-	rl.ClearBackground(rl.GetColor(uint(colorHex)))
+func (r *RaylibDisplay) Clear(color core.Color) {
+	rl.ClearBackground(rl.Color{R: color.R, G: color.G, B: color.B, A: color.A})
 }
 
-func (r *RaylibDisplay) DrawRect(gridX, gridY int, colorHex uint32) {
+func (r *RaylibDisplay) DrawRect(gridX, gridY int, color core.Color) {
 	rl.DrawRectangle(
 		int32(gridX)*r.CellWidth,
 		int32(gridY)*r.CellHeight,
 		r.CellWidth,
 		r.CellHeight,
-		rl.GetColor(uint(colorHex)),
+		rl.Color{R: color.R, G: color.G, B: color.B, A: color.A},
 	)
 }
 
-func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32) {
+func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, color core.Color) {
 	pixelY := int32(gridY) * r.CellHeight
 
 	// Roger-style roguelikes use character-per-cell grid.
@@ -104,11 +101,11 @@ func (r *RaylibDisplay) DrawText(gridX, gridY int, text string, colorHex uint32)
 	// but we WON'T jump a full CellWidth per character.
 
 	position := rl.NewVector2(float32(int32(gridX)*r.CellWidth), float32(pixelY))
-	rl.DrawTextEx(r.Font, text, position, float32(r.FontSize), 1, rl.GetColor(uint(colorHex)))
+	rl.DrawTextEx(r.Font, text, position, float32(r.FontSize), 1, rl.Color{R: color.R, G: color.G, B: color.B, A: color.A})
 }
 
 // DrawSprite cuts a frame out of the 4x4 Tileset atlas and draws it to the screen grid.
-func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32) {
+func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, color core.Color) {
 	// Dynamically calculate the tile size based on the texture dimensions (assuming 4x4 grid)
 	spriteWidth := float32(r.Tileset.Width) / 4.0
 	spriteHeight := float32(r.Tileset.Height) / 4.0
@@ -125,76 +122,48 @@ func (r *RaylibDisplay) DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHe
 	)
 
 	origin := rl.NewVector2(0, 0)
-	rl.DrawTexturePro(r.Tileset, sourceRec, destRec, origin, 0.0, rl.GetColor(uint(colorHex)))
+	rl.DrawTexturePro(r.Tileset, sourceRec, destRec, origin, 0.0, rl.Color{R: color.R, G: color.G, B: color.B, A: color.A})
 }
 
 func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	var events []core.InputEvent
+
 	if rl.IsKeyPressed(rl.KeyW) || rl.IsKeyPressedRepeat(rl.KeyW) {
-		events = append(events, core.InputEvent{Key: core.KeyW})
+		events = append(events, core.InputEvent{Key: rl.KeyW})
 	}
 	if rl.IsKeyPressed(rl.KeyS) || rl.IsKeyPressedRepeat(rl.KeyS) {
-		events = append(events, core.InputEvent{Key: core.KeyS})
+		events = append(events, core.InputEvent{Key: rl.KeyS})
 	}
 	if rl.IsKeyPressed(rl.KeyA) || rl.IsKeyPressedRepeat(rl.KeyA) {
-		events = append(events, core.InputEvent{Key: core.KeyA})
+		events = append(events, core.InputEvent{Key: rl.KeyA})
 	}
 	if rl.IsKeyPressed(rl.KeyD) || rl.IsKeyPressedRepeat(rl.KeyD) {
-		events = append(events, core.InputEvent{Key: core.KeyD})
+		events = append(events, core.InputEvent{Key: rl.KeyD})
 	}
 	if rl.IsKeyPressed(rl.KeyP) {
-		events = append(events, core.InputEvent{Key: core.KeyP})
+		events = append(events, core.InputEvent{Key: rl.KeyP})
 	}
 	if rl.IsKeyPressed(rl.KeyQ) {
-		events = append(events, core.InputEvent{Key: core.KeyQ})
+		events = append(events, core.InputEvent{Key: rl.KeyQ})
 	}
 	if rl.IsKeyPressed(rl.KeyE) {
-		events = append(events, core.InputEvent{Key: core.KeyE})
+		events = append(events, core.InputEvent{Key: rl.KeyE})
 	}
 	if rl.IsKeyPressed(rl.KeyEscape) {
-		events = append(events, core.InputEvent{Key: core.KeyEsc})
+		events = append(events, core.InputEvent{Key: rl.KeyEscape})
 	}
 	return events
 }
 
-func MapANSIColor(ansiColor string) uint32 {
-	colorMap := map[string]uint32{
-		world.Red: 0xFF0000FF, world.Green: 0x00FF00FF, world.Yellow: 0xFFFF00FF,
-		world.Blue: 0x0000FFFF, world.Magenta: 0xFF00FFFF, world.Cyan: 0x00FFFFFF,
-		world.White: 0xFFFFFFFF, world.Gray: 0x808080FF, world.BrightWhite: 0xFFFFFFFF,
-	}
-	if hex, ok := colorMap[ansiColor]; ok {
-		return hex
-	}
-	return 0xFFFFFFFF
-}
-
-func ExtractTextAndColor(s string) (string, uint32) {
-	if !strings.HasPrefix(s, "\x1b[") && !strings.HasPrefix(s, "\033[") {
-		return s, 0xFFFFFFFF
-	}
-	mIdx := strings.Index(s, "m")
-	if mIdx == -1 {
-		return s, 0xFFFFFFFF
-	}
-	colorCode := s[:mIdx+1]
-	text := strings.ReplaceAll(s[mIdx+1:], world.Reset, "")
-	return text, MapANSIColor(colorCode)
-}
-
-// DarkenColor takes a hex color and reduces its brightness by the given factor.
-func DarkenColor(colorHex uint32, factor uint32) uint32 {
+// DarkenColor takes a core.Color and reduces its brightness by the given factor.
+func DarkenColor(color core.Color, factor uint8) core.Color {
 	if factor <= 1 {
-		return colorHex
+		return color
 	}
-	r := (colorHex >> 24) & 0xFF
-	g := (colorHex >> 16) & 0xFF
-	b := (colorHex >> 8) & 0xFF
-	a := colorHex & 0xFF
-
-	r = r / factor
-	g = g / factor
-	b = b / factor
-
-	return (r << 24) | (g << 16) | (b << 8) | a
+	return core.Color{
+		R: color.R / factor,
+		G: color.G / factor,
+		B: color.B / factor,
+		A: color.A,
+	}
 }

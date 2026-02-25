@@ -10,8 +10,9 @@ type Display interface {
 	ShouldClose() bool
 	BeginFrame()
 	EndFrame()
-	Clear(colorHex uint32)
-	DrawText(gridX, gridY int, text string, colorHex uint32)
-	DrawSprite(gridX, gridY int, sheetX, sheetY int, colorHex uint32)
+	Clear(color core.Color)
+	DrawRect(gridX, gridY int, color core.Color)
+	DrawText(gridX, gridY int, text string, color core.Color)
+	DrawSprite(gridX, gridY int, sheetX, sheetY int, color core.Color)
 	PollInput() []core.InputEvent
 }
