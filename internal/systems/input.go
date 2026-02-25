@@ -105,10 +105,10 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 					if (w.Masks[i] & components.MaskGlyph) != 0 {
 						glyph := &w.Glyphs[i]
 						if gen.IsActive {
-							glyph.ColorCode = world.Green
+							glyph.Color = core.Green
 							glyph.Char = "⚡"
 						} else {
-							glyph.ColorCode = world.Red
+							glyph.Color = core.Red
 							glyph.Char = "X"
 						}
 					}
@@ -126,7 +126,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 						w.Interactables[i].Prompt = "Press [E] to Close Door"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Char = "/"
-							w.Glyphs[i].ColorCode = world.Gray
+							w.Glyphs[i].Color = core.Gray
 						}
 					} else {
 						// Close the door
@@ -134,7 +134,20 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 						w.Interactables[i].Prompt = "Press [E] to Open Door"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Char = "+"
-							w.Glyphs[i].ColorCode = world.White
+							w.Glyphs[i].Color = core.White
+						}
+					}
+					return // Stop after interacting
+				}
+
+				// 3. Terminal
+				if (w.Masks[i] & components.MaskTerminal) != 0 {
+					terminal := &w.Terminals[i]
+					if !terminal.HasSaved {
+						terminal.HasSaved = true
+						w.Interactables[i].Prompt = "[ CHECKPOINT SAVED ]"
+						if (w.Masks[i] & components.MaskGlyph) != 0 {
+							w.Glyphs[i].Color = core.Green
 						}
 					}
 					return // Stop after interacting

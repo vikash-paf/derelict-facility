@@ -42,18 +42,10 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map) {
 
 		if hasSprite {
 			spr := w.Sprites[i]
-			hexColor := uint32(0xFFFFFFFF)
-			if spr.ColorCode != "" {
-				hexColor = display.MapANSIColor(spr.ColorCode)
-			}
-			disp.DrawSprite(pos.X, pos.Y, spr.SheetX, spr.SheetY, hexColor)
+			disp.DrawSprite(pos.X, pos.Y, spr.SheetX, spr.SheetY, spr.Color)
 		} else if hasGlyph {
 			glyph := w.Glyphs[i]
-			hexColor := uint32(0xFFFFFFFF)
-			if glyph.ColorCode != "" {
-				hexColor = display.MapANSIColor(glyph.ColorCode)
-			}
-			disp.DrawText(pos.X, pos.Y, glyph.Char, hexColor)
+			disp.DrawText(pos.X, pos.Y, glyph.Char, glyph.Color)
 		}
 	}
 }

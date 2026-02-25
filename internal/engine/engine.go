@@ -152,7 +152,7 @@ func (e *Engine) Resume() {
 // Renders top to bottom as separate layers.
 func (e *Engine) render() {
 	e.Display.BeginFrame()
-	e.Display.Clear(0x000000FF) // Black background
+	e.Display.Clear(core.Black) // Black background
 
 	// Determine active theme based on global states
 	activeTheme := e.BaseTheme
@@ -175,9 +175,9 @@ func (e *Engine) render() {
 }
 
 func (e *Engine) renderPauseMenu() {
-	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", world.Red)
-	e.drawTextCentered(16, "Press [ESC] to Resume", world.White)
-	e.drawTextCentered(17, "Press [Q] to Quit", world.Gray)
+	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", core.Red)
+	e.drawTextCentered(16, "Press [ESC] to Resume", core.White)
+	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
 }
 
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
@@ -208,7 +208,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			// We only draw the path if it's on a tile we've at least explored!
 			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "*", display.MapANSIColor(world.Red))
+				e.Display.DrawText(x, y, "*", core.Red)
 				continue
 			}
 
@@ -218,7 +218,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 
 			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
-				char, color := display.ExtractTextAndColor(theme[tile.Type])
+				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
 				// Add texture to floors based on their Variant
 				if tile.Type == world.TileTypeFloor {
@@ -285,7 +285,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			if tile.Explored {
-				char, color := display.ExtractTextAndColor(theme[tile.Type])
+				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
 				// Apply the same texture to explored floors
 				if tile.Type == world.TileTypeFloor {
@@ -352,7 +352,7 @@ func (e *Engine) renderHUD() {
 
 	// strings.Repeat is a highly optimized Go standard library function
 	divider := strings.Repeat("═", e.Map.Width)
-	e.drawText(0, hudY, divider, world.Gray)
+	e.drawText(0, hudY, divider, core.Gray)
 
 	statusText := "HEALTHY"
 	autopilotEngaged := false
@@ -387,43 +387,41 @@ func (e *Engine) renderHUD() {
 		}
 	}
 
-	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), world.Cyan)
+	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
 
 	if autopilotEngaged {
-		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", world.Red)
+		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
 	} else {
-		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", world.Gray)
+		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
 	// %06d formats the integer to always be 6 digits (e.g., 000142)
 	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
-	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, world.White)
+	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, core.White)
 
 	if interactPrompt != "" {
 		// Draw the prompt blinking above the HUD
 		if e.tickCount%30 < 15 {
-			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), world.Green)
+			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), core.Green)
 		}
 	}
 
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
-	e.drawText(2, hudY+2, controls, world.Gray)
+	e.drawText(2, hudY+2, controls, core.Gray)
 }
 
-func (e *Engine) drawTextCentered(y int, text string, colorCode string) {
+func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
 	centerX := e.Map.Width / 2
 	halfText := len(text) / 2
 	x := centerX - halfText
 
-	textStr, _ := display.ExtractTextAndColor(text)
-	colorHex := display.MapANSIColor(colorCode)
+	
 
-	e.Display.DrawText(x, y, textStr, colorHex)
+	e.Display.DrawText(x, y, text, color)
 }
 
-func (e *Engine) drawText(x, y int, text string, colorCode string) {
-	textStr, _ := display.ExtractTextAndColor(text)
-	colorHex := display.MapANSIColor(colorCode)
+func (e *Engine) drawText(x, y int, text string, color core.Color) {
+	
 
-	e.Display.DrawText(x, y, textStr, colorHex)
+	e.Display.DrawText(x, y, text, color)
 }
