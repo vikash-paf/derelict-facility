@@ -1,6 +1,7 @@
 package systems
 
 import (
+	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
@@ -30,17 +31,17 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 	for _, event := range events {
 		switch event.Key {
-		case core.KeyW:
+		case rl.KeyW:
 			dy = -1
-		case core.KeyS:
+		case rl.KeyS:
 			dy = 1
-		case core.KeyA:
+		case rl.KeyA:
 			dx = -1
-		case core.KeyD:
+		case rl.KeyD:
 			dx = 1
-		case core.KeyP:
+		case rl.KeyP:
 			toggleAutopilot = true
-		case core.KeyE:
+		case rl.KeyE:
 			interactPressed = true
 		}
 	}
