@@ -113,7 +113,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map)
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
-	if e.tickCount%2 == 0 {
+	if e.tickCount%6 == 0 {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
