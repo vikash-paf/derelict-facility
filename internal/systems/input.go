@@ -59,7 +59,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y)
+				handleInteraction(w, positions.X, positions.Y, gameMap)
 			}
 
 			// Don't manually move if Autopilot is running
@@ -82,7 +82,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int) {
+func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map) {
 	targetMask := components.MaskPosition | components.MaskInteractable
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (w.Masks[i] & targetMask) == targetMask {
@@ -149,6 +149,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int) {
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Color = core.Green
 						}
+						saveState(w, gameMap)
 					}
 					return // Stop after interacting
 				}
