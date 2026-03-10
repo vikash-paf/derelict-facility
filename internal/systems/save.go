@@ -28,3 +28,20 @@ func saveState(w *ecs.World, m *world.Map) {
 	encoder := gob.NewEncoder(file)
 	encoder.Encode(data)
 }
+
+func LoadState() (*SaveGameData, error) {
+	file, err := os.Open("savegame.sav")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var data SaveGameData
+	decoder := gob.NewDecoder(file)
+	err = decoder.Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
