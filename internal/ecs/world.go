@@ -9,8 +9,8 @@ const MaxEntities = 1000
 
 // World manages all entities and their component data in flat arrays (SoA).
 type World struct {
-	nextEntityID Entity
-	freeEntities []Entity // Queue of IDs from destroyed entities we can reuse
+	NextEntityID Entity
+	FreeEntities []Entity // Queue of IDs from destroyed entities we can reuse
 
 	// The Component Mask array. If Masks[5] has the MaskPosition bit set,
 	// it means Positions[5] contains valid data for Entity 5.
@@ -29,20 +29,20 @@ type World struct {
 
 func NewWorld() *World {
 	return &World{
-		nextEntityID: 0, // Start at 0 so it aligns with array indices!
-		freeEntities: make([]Entity, 0),
+		NextEntityID: 0, // Start at 0 so it aligns with array indices!
+		FreeEntities: make([]Entity, 0),
 	}
 }
 
 func (w *World) CreateEntity() Entity {
 	var id Entity
-	if len(w.freeEntities) > 0 {
+	if len(w.FreeEntities) > 0 {
 		// Pop an ID off the free list
-		id = w.freeEntities[len(w.freeEntities)-1]
-		w.freeEntities = w.freeEntities[:len(w.freeEntities)-1]
+		id = w.FreeEntities[len(w.FreeEntities)-1]
+		w.FreeEntities = w.FreeEntities[:len(w.FreeEntities)-1]
 	} else {
-		id = w.nextEntityID
-		w.nextEntityID++
+		id = w.NextEntityID
+		w.NextEntityID++
 		// If we exceed MaxEntities in a real game, we'd need to grow the arrays or panic.
 		if id >= MaxEntities {
 			panic("Max entities reached!")
@@ -55,7 +55,7 @@ func (w *World) CreateEntity() Entity {
 
 func (w *World) DestroyEntity(e Entity) {
 	w.Masks[e] = components.MaskNone // Unset all bits. The data stays in RAM, but systems will ignore it.
-	w.freeEntities = append(w.freeEntities, e)
+	w.FreeEntities = append(w.FreeEntities, e)
 }
 
 func (w *World) AddPosition(e Entity, pos components.Position) {
