@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/vikash-paf/derelict-facility/internal/components"
@@ -11,8 +12,6 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/systems"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
-
-import "flag"
 
 func main() {
 	mapFile := flag.String("map", "", "path to a JSON map file to load")
