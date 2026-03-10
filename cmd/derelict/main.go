@@ -12,7 +12,12 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
+import "flag"
+
 func main() {
+	mapFile := flag.String("map", "", "path to a JSON map file to load")
+	flag.Parse()
+
 	mapWidth, mapHeight := 120, 40
 	windowWidth, windowHeight := 120, 45
 
@@ -40,14 +45,24 @@ func main() {
 		ecsWorld = saveData.World
 	} else {
 		fmt.Println("No savegame found, generating new world...")
-		// 2. Build the world map FIRST
-		// seed := time.Now().UnixNano()
-		seed := 12345
-		generator := world.NewFacilityGenerator(uint64(seed))
 		var playerX, playerY int
-		generatedMap, playerX, playerY = generator.Generate(mapWidth, mapHeight)
-		if generatedMap == nil {
-			panic("Failed to generate map")
+		if *mapFile != "" {
+			fmt.Println("Loading map from JSON:", *mapFile)
+			loader := world.NewJSONMapLoader()
+			var err error
+			generatedMap, playerX, playerY, err = loader.Load(*mapFile)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to load map from %s: %v", *mapFile, err))
+			}
+		} else {
+			// 2. Build the world map FIRST
+			// seed := time.Now().UnixNano()
+			seed := 12345
+			generator := world.NewFacilityGenerator(uint64(seed))
+			generatedMap, playerX, playerY = generator.Generate(mapWidth, mapHeight)
+			if generatedMap == nil {
+				panic("Failed to generate map")
+			}
 		}
 
 		// 3. Setup the ECS and spawn the Player
