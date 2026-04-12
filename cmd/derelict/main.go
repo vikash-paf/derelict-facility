@@ -18,7 +18,9 @@ func main() {
 	flag.Parse()
 
 	mapWidth, mapHeight := 120, 40
-	windowWidth, windowHeight := 120, 45
+	viewWidth, viewHeight := 80, 25 // Camera sees 80x25 tiles
+	hudHeight := 6
+	windowWidth, windowHeight := viewWidth, viewHeight+hudHeight
 
 	cellWidth := int32(10)
 	cellHeight := int32(20)
@@ -113,7 +115,7 @@ func main() {
 	}
 
 	// 7. Hand everything to the Engine
-	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty)
+	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty, viewWidth, viewHeight)
 
 	err = gameEngine.Run()
 	if err != nil {
