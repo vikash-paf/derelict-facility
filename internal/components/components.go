@@ -20,7 +20,13 @@ const (
 	MaskPowerGenerator
 	MaskDoor
 	MaskTerminal
+	MaskNarrative
 )
+
+// Narrative stores flavor text or logs associated with an entity.
+type Narrative struct {
+	Text string
+}
 
 // PlayerStatus represents the health/condition of a player entity.
 type PlayerStatus uint8

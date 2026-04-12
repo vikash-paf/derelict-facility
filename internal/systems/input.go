@@ -23,7 +23,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string)) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -59,7 +59,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y, gameMap)
+				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc)
 			}
 
 			// Don't manually move if Autopilot is running
@@ -82,7 +82,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map) {
+func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string)) {
 	targetMask := components.MaskPosition | components.MaskInteractable
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (w.Masks[i] & targetMask) == targetMask {
@@ -112,6 +112,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map) {
 							glyph.Char = "X"
 						}
 					}
+					logFunc("Power Generator toggled.")
 					return // Stop after interacting
 				}
 
@@ -128,6 +129,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map) {
 							w.Glyphs[i].Char = "/"
 							w.Glyphs[i].Color = core.Gray
 						}
+						logFunc("Door opened.")
 					} else {
 						// Close the door
 						w.AddSolid(i)
@@ -136,6 +138,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map) {
 							w.Glyphs[i].Char = "+"
 							w.Glyphs[i].Color = core.White
 						}
+						logFunc("Door closed.")
 					}
 					return // Stop after interacting
 				}
@@ -143,13 +146,20 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map) {
 				// 3. Terminal
 				if (w.Masks[i] & components.MaskTerminal) != 0 {
 					terminal := &w.Terminals[i]
+
+					// If it has narrative data, display it
+					if (w.Masks[i] & components.MaskNarrative) != 0 {
+						logFunc(w.Narratives[i].Text)
+					}
+
 					if !terminal.HasSaved {
 						terminal.HasSaved = true
-						w.Interactables[i].Prompt = "[ CHECKPOINT SAVED ]"
+						w.Interactables[i].Prompt = "Press [E] to Access Terminal"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Color = core.Green
 						}
 						saveState(w, gameMap)
+						logFunc("Checkpoint saved.")
 					}
 					return // Stop after interacting
 				}

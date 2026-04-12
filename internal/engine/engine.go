@@ -41,6 +41,7 @@ type Engine struct {
 	Running    bool
 	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
 	Pathfinder *world.Pathfinder
+	Messages   []string
 }
 
 func NewEngine(
@@ -110,7 +111,17 @@ func (e *Engine) processAutopilot() {
 
 func (e *Engine) processSimulation(events []core.InputEvent) {
 	// Let the systems tick using the events we polled at the start of the frame!
-	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map)
+	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, func(msg string) {
+		// If the new message is the same as the last one, don't repeat it
+		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
+			return
+		}
+		e.Messages = append(e.Messages, msg)
+		// Limit to last 3 messages for UI space
+		if len(e.Messages) > 3 {
+			e.Messages = e.Messages[1:]
+		}
+	})
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
 	if e.tickCount%6 == 0 {
@@ -406,8 +417,20 @@ func (e *Engine) renderHUD() {
 		}
 	}
 
+	// Draw Message Log
+	for i, msg := range e.Messages {
+		// Calculate color based on age (older messages are darker)
+		color := core.Green
+		if i == 0 && len(e.Messages) == 3 {
+			color = display.DarkenColor(core.Green, 3)
+		} else if i == 1 && len(e.Messages) == 3 {
+			color = display.DarkenColor(core.Green, 1)
+		}
+		e.drawText(2, hudY+2+i, "> "+msg, color)
+	}
+
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
-	e.drawText(2, hudY+2, controls, core.Gray)
+	e.drawText(2, hudY+5, controls, core.Gray)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
