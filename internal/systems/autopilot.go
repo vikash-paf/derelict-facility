@@ -24,6 +24,11 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder) {
 
 			// 1. If we don't have a path, find a new destination!
 			if len(ctrl.CurrentPath) == 0 {
+				if len(gameMap.Rooms) == 0 {
+					// Fallback if no rooms are defined (common in hand-crafted maps)
+					ctrl.Autopilot = false
+					continue
+				}
 				// Pick a random room
 				targetRoom := gameMap.Rooms[rand.Intn(len(gameMap.Rooms))]
 				targetX, targetY := targetRoom.Center()
