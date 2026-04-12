@@ -89,7 +89,7 @@ func main() {
 		for _, termPos := range generatedMap.Terminals {
 			termEnt := ecsWorld.CreateEntity()
 			ecsWorld.AddPosition(termEnt, components.Position{X: termPos.X, Y: termPos.Y})
-			ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "🖥️", Color: core.Cyan})
+			ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "T", Color: core.Cyan})
 			ecsWorld.AddSolid(termEnt)
 			ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Access Terminal"})
 			ecsWorld.AddTerminal(termEnt, components.Terminal{HasSaved: false})
