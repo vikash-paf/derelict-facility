@@ -36,6 +36,8 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 	m := NewMap(mapData.Width, mapData.Height)
 	playerX, playerY := mapData.Width/2, mapData.Height/2
 	var doors []entity.Point
+	var terminals []entity.Point
+	var generators []entity.Point
 
 	for y, row := range mapData.Rows {
 		if y >= mapData.Height {
@@ -54,6 +56,12 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 			case 'D': // Door
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				doors = append(doors, entity.Point{X: x, Y: y})
+			case 'T': // Terminal
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				terminals = append(terminals, entity.Point{X: x, Y: y})
+			case 'G': // Power Generator
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				generators = append(generators, entity.Point{X: x, Y: y})
 			case '@': // Player start position
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				playerX, playerY = x, y
@@ -64,6 +72,8 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 	}
 
 	m.Doors = doors
+	m.Terminals = terminals
+	m.PowerGenerators = generators
 
 	// Calculate bitmasks for walls so they tile properly
 	l.calculateWallBitmasks(m)

@@ -5,11 +5,13 @@ import (
 )
 
 type Map struct {
-	Tiles  []Tile
-	Rooms  []Rect
-	Doors  []entity.Point
-	Width  int
-	Height int
+	Tiles           []Tile
+	Rooms           []Rect
+	Doors           []entity.Point
+	Terminals       []entity.Point
+	PowerGenerators []entity.Point
+	Width           int
+	Height          int
 }
 
 func NewMap(width, height int) *Map {

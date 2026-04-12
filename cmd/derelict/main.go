@@ -75,29 +75,31 @@ func main() {
 			Status:    components.PlayerStatusHealthy,
 		})
 
-		// 5. Spawn a test Power Generator
-		genEnt := ecsWorld.CreateEntity()
-		ecsWorld.AddPosition(genEnt, components.Position{X: playerX + 2, Y: playerY})
-		ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
-		ecsWorld.AddSolid(genEnt)
-		ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
-		ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{IsActive: false})
+		// 5. Spawn Power Generators from Map
+		for _, genPos := range generatedMap.PowerGenerators {
+			genEnt := ecsWorld.CreateEntity()
+			ecsWorld.AddPosition(genEnt, components.Position{X: genPos.X, Y: genPos.Y})
+			ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
+			ecsWorld.AddSolid(genEnt)
+			ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+			ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{IsActive: false})
+		}
 
-		// Spawn a Save Terminal
-		termEnt := ecsWorld.CreateEntity()
-		ecsWorld.AddPosition(termEnt, components.Position{X: playerX, Y: playerY + 2})
-		ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "🖥️", Color: core.Cyan})
-		ecsWorld.AddSolid(termEnt)
-		ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Save Checkpoint"})
-		ecsWorld.AddTerminal(termEnt, components.Terminal{HasSaved: false})
+		// Spawn Terminals from Map
+		for _, termPos := range generatedMap.Terminals {
+			termEnt := ecsWorld.CreateEntity()
+			ecsWorld.AddPosition(termEnt, components.Position{X: termPos.X, Y: termPos.Y})
+			ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "🖥️", Color: core.Cyan})
+			ecsWorld.AddSolid(termEnt)
+			ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Access Terminal"})
+			ecsWorld.AddTerminal(termEnt, components.Terminal{HasSaved: false})
+			ecsWorld.AddNarrative(termEnt, components.Narrative{Text: "LOG 001: Sector 4 containment breach. All non-essential personnel evacuate immediately. The life support backup is failing."})
+		}
 
 		// 6. Spawn Doors
 		for _, doorPos := range generatedMap.Doors {
-			// Don't spawn a door right on top of the player or generator
+			// Don't spawn a door right on top of the player
 			if doorPos.X == playerX && doorPos.Y == playerY {
-				continue
-			}
-			if doorPos.X == playerX+2 && doorPos.Y == playerY {
 				continue
 			}
 
