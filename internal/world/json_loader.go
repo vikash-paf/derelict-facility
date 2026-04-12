@@ -12,6 +12,12 @@ type JSONMapData struct {
 	Width  int      `json:"width"`
 	Height int      `json:"height"`
 	Rows   []string `json:"rows"`
+	Rooms  []struct {
+		X      int `json:"x"`
+		Y      int `json:"y"`
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"rooms"`
 }
 
 // JSONMapLoader handles loading a world map from a JSON file.
@@ -74,6 +80,16 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 	m.Doors = doors
 	m.Terminals = terminals
 	m.PowerGenerators = generators
+
+	// Load room metadata if present
+	for _, r := range mapData.Rooms {
+		m.Rooms = append(m.Rooms, Rect{
+			X1: r.X,
+			Y1: r.Y,
+			X2: r.X + r.Width,
+			Y2: r.Y + r.Height,
+		})
+	}
 
 	// Calculate bitmasks for walls so they tile properly
 	l.calculateWallBitmasks(m)

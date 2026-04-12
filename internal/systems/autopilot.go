@@ -25,7 +25,7 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder) {
 			// 1. If we don't have a path, find a new destination!
 			if len(ctrl.CurrentPath) == 0 {
 				if len(gameMap.Rooms) == 0 {
-					// Fallback if no rooms are defined (common in hand-crafted maps)
+					// Fallback if no rooms are defined
 					ctrl.Autopilot = false
 					continue
 				}
