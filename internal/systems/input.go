@@ -83,19 +83,30 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 }
 
 func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string)) {
+	// Find the player's clearance first
+	playerClearance := uint32(0)
+	playerEntID := ecs.Entity(0)
+	foundPlayer := false
+	playerMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (w.Masks[i] & playerMask) == playerMask {
+			playerClearance = w.PlayerControls[i].SecurityClearance
+			playerEntID = i
+			foundPlayer = true
+			break
+		}
+	}
+
 	targetMask := components.MaskPosition | components.MaskInteractable
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (w.Masks[i] & targetMask) == targetMask {
 			pos := w.Positions[i]
-			// Check adjacency (including diagonals, or just orthogonal?)
-			// Orthogonal:
+			// Check adjacency
 			dx := pos.X - playerX
 			dy := pos.Y - playerY
 			distSq := dx*dx + dy*dy
 
-			if distSq <= 2 { // 1 tile away orthogonally (distSq=1) or diagonally (distSq=2) or same tile (0)
-				// What kind of interactable is it?
-
+			if distSq <= 2 {
 				// 1. Power Generator
 				if (w.Masks[i] & components.MaskPowerGenerator) != 0 {
 					gen := &w.PowerGenerators[i]
@@ -113,16 +124,22 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 						}
 					}
 					logFunc("Power Generator toggled.")
-					return // Stop after interacting
+					return
 				}
 
 				// 2. Door
 				if (w.Masks[i] & components.MaskDoor) != 0 {
 					door := &w.Doors[i]
+
+					// Check security clearance
+					if door.RequiredClearance != 0 && (playerClearance&door.RequiredClearance) == 0 {
+						logFunc("ACCESS DENIED: Required Clearance Missing.")
+						return
+					}
+
 					door.IsOpen = !door.IsOpen
 
 					if door.IsOpen {
-						// Open the door
 						w.RemoveSolid(i)
 						w.Interactables[i].Prompt = "Press [E] to Close Door"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
@@ -131,7 +148,6 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 						}
 						logFunc("Door opened.")
 					} else {
-						// Close the door
 						w.AddSolid(i)
 						w.Interactables[i].Prompt = "Press [E] to Open Door"
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
@@ -140,12 +156,20 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 						}
 						logFunc("Door closed.")
 					}
-					return // Stop after interacting
+					return
 				}
 
 				// 3. Terminal
 				if (w.Masks[i] & components.MaskTerminal) != 0 {
 					terminal := &w.Terminals[i]
+
+					// Grant clearance if terminal has it
+					if terminal.GrantClearance != 0 && foundPlayer {
+						if (w.PlayerControls[playerEntID].SecurityClearance & terminal.GrantClearance) == 0 {
+							w.PlayerControls[playerEntID].SecurityClearance |= terminal.GrantClearance
+							logFunc("SECURITY CLEARANCE UPDATED.")
+						}
+					}
 
 					// If it has narrative data, display it
 					if (w.Masks[i] & components.MaskNarrative) != 0 {
@@ -161,7 +185,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 						saveState(w, gameMap)
 						logFunc("Checkpoint saved.")
 					}
-					return // Stop after interacting
+					return
 				}
 			}
 		}

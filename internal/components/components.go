@@ -68,9 +68,10 @@ type Sprite struct {
 // PlayerControl indicates that this entity is currently controllable by the user.
 // It also holds properties specific to their condition.
 type PlayerControl struct {
-	Autopilot   bool
-	CurrentPath []entity.Point
-	Status      PlayerStatus
+	Autopilot         bool
+	CurrentPath       []entity.Point
+	Status            PlayerStatus
+	SecurityClearance uint32 // Bitmask of keys/clearances found
 }
 
 // Glyph defines the graphical representation of an entity using a text character or emoji.
@@ -94,11 +95,13 @@ type PowerGenerator struct {
 
 // Door represents a mechanism that can block movement and vision.
 type Door struct {
-	IsOpen bool
+	IsOpen            bool
+	RequiredClearance uint32 // 0 means unlocked, otherwise needs matching bit
 }
 
 // Terminal allows saving the game.
 type Terminal struct {
-	HasSaved bool
+	HasSaved       bool
+	GrantClearance uint32 // Bit to unlock in player's clearance mask
 }
 

@@ -94,8 +94,18 @@ func main() {
 			ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "T", Color: core.Cyan})
 			ecsWorld.AddSolid(termEnt)
 			ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Access Terminal"})
-			ecsWorld.AddTerminal(termEnt, components.Terminal{HasSaved: false})
-			ecsWorld.AddNarrative(termEnt, components.Narrative{Text: "LOG 001: Sector 4 containment breach. All non-essential personnel evacuate immediately. The life support backup is failing."})
+
+			terminalComp := components.Terminal{HasSaved: false}
+			narrativeComp := components.Narrative{Text: "LOG 001: Sector 4 containment breach. All non-essential personnel evacuate immediately. The life support backup is failing."}
+
+			// Special case: The terminal in Lab 6 grants security clearance
+			if termPos.X == 36 && termPos.Y == 12 {
+				terminalComp.GrantClearance = 1
+				narrativeComp.Text = "SECURITY OVERRIDE INITIALIZED: Sector 4 Security Gate has been UNLOCKED. [Auth: Admin_7]"
+			}
+
+			ecsWorld.AddTerminal(termEnt, terminalComp)
+			ecsWorld.AddNarrative(termEnt, narrativeComp)
 		}
 
 		// 6. Spawn Doors
@@ -110,7 +120,15 @@ func main() {
 			ecsWorld.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.White})
 			ecsWorld.AddSolid(doorEnt) // Closed doors block movement!
 			ecsWorld.AddInteractable(doorEnt, components.Interactable{Prompt: "Press [E] to Open Door"})
-			ecsWorld.AddDoor(doorEnt, components.Door{IsOpen: false})
+
+			doorComp := components.Door{IsOpen: false}
+			// Special case: The first door in the hub is locked
+			if doorPos.X == 10 && doorPos.Y == 8 {
+				doorComp.RequiredClearance = 1
+				ecsWorld.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.Red}) // Visual indicator it's locked
+			}
+
+			ecsWorld.AddDoor(doorEnt, doorComp)
 		}
 	}
 

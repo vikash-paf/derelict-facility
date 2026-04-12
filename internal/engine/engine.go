@@ -253,6 +253,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 		}
 	}
 
+	// Iterate over viewport bounds ONLY
 	for y := e.Camera.Y; y < e.Camera.Y+e.Camera.Height; y++ {
 		for x := e.Camera.X; x < e.Camera.X+e.Camera.Width; x++ {
 			tile := e.Map.GetTile(x, y)
@@ -260,14 +261,17 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				continue
 			}
 
+			// Translate world X,Y to screen coordinates
 			screenX, screenY := e.Camera.WorldToScreen(x, y)
 
+			// 1. Draw Autopilot Path
 			isPathTile := e.PathLookup[y*e.Map.Width+x]
 			if isPathTile && (tile.Visible || tile.Explored) {
 				e.Display.DrawText(screenX, screenY, "*", core.Red)
 				continue
 			}
 
+			// 2. Draw Map Base
 			if tile.Type == world.TileTypeEmpty {
 				continue
 			}
