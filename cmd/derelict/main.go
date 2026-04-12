@@ -115,7 +115,14 @@ func main() {
 	}
 
 	// 7. Hand everything to the Engine
-	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty, viewWidth, viewHeight)
+	gameEngine := engine.NewEngine(
+		disp,
+		generatedMap,
+		ecsWorld,
+		world.TileVariantGritty,
+		viewWidth,
+		viewHeight,
+	)
 
 	err = gameEngine.Run()
 	if err != nil {
