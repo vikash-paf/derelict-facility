@@ -12,12 +12,6 @@ type JSONMapData struct {
 	Width  int      `json:"width"`
 	Height int      `json:"height"`
 	Rows   []string `json:"rows"`
-	Rooms  []struct {
-		X      int `json:"x"`
-		Y      int `json:"y"`
-		Width  int `json:"width"`
-		Height int `json:"height"`
-	} `json:"rooms"`
 }
 
 // JSONMapLoader handles loading a world map from a JSON file.
@@ -81,20 +75,77 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 	m.Terminals = terminals
 	m.PowerGenerators = generators
 
-	// Load room metadata if present
-	for _, r := range mapData.Rooms {
-		m.Rooms = append(m.Rooms, Rect{
-			X1: r.X,
-			Y1: r.Y,
-			X2: r.X + r.Width,
-			Y2: r.Y + r.Height,
-		})
-	}
+	// Automatically derive rooms from the floor layout
+	l.deriveRooms(m)
 
 	// Calculate bitmasks for walls so they tile properly
 	l.calculateWallBitmasks(m)
 
 	return m, playerX, playerY, nil
+}
+
+// deriveRooms uses a flood-fill algorithm to find contiguous floor areas.
+func (l *JSONMapLoader) deriveRooms(m *Map) {
+	visited := make([]bool, m.Width*m.Height)
+	
+	// Create a quick lookup for door locations to use as boundaries
+	isDoor := make([]bool, m.Width*m.Height)
+	for _, d := range m.Doors {
+		isDoor[d.Y*m.Width+d.X] = true
+	}
+
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			idx := y*m.Width + x
+			tile := m.GetTile(x, y)
+
+			// Start a fill if we find an unvisited floor tile that isn't a door
+			if tile != nil && tile.Type == TileTypeFloor && !visited[idx] && !isDoor[idx] {
+				minX, minY := x, y
+				maxX, maxY := x, y
+
+				// Simple BFS for flood fill
+				queue := []entity.Point{{X: x, Y: y}}
+				visited[idx] = true
+
+				for len(queue) > 0 {
+					p := queue[0]
+					queue = queue[1:]
+
+					if p.X < minX { minX = p.X }
+					if p.Y < minY { minY = p.Y }
+					if p.X > maxX { maxX = p.X }
+					if p.Y > maxY { maxY = p.Y }
+
+					// Check 4 neighbors
+					neighbors := []entity.Point{
+						{X: p.X, Y: p.Y - 1}, {X: p.X, Y: p.Y + 1},
+						{X: p.X - 1, Y: p.Y}, {X: p.X + 1, Y: p.Y},
+					}
+
+					for _, n := range neighbors {
+						if n.X < 0 || n.X >= m.Width || n.Y < 0 || n.Y >= m.Height {
+							continue
+						}
+						nIdx := n.Y*m.Width + n.X
+						nTile := m.GetTile(n.X, n.Y)
+						if nTile != nil && nTile.Type == TileTypeFloor && !visited[nIdx] && !isDoor[nIdx] {
+							visited[nIdx] = true
+							queue = append(queue, n)
+						}
+					}
+				}
+
+				// If the area is big enough to be a room, add it
+				if (maxX-minX) >= 1 && (maxY-minY) >= 1 {
+					m.Rooms = append(m.Rooms, Rect{
+						X1: minX, Y1: minY,
+						X2: maxX, Y2: maxY,
+					})
+				}
+			}
+		}
+	}
 }
 
 // calculateWallBitmasks sets the bitmask for walls to connect seamlessly.
