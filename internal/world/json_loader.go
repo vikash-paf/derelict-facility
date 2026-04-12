@@ -53,7 +53,7 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
 			case '.': // Floor
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
-			case 'D': // Door
+			case '+': // Door
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				doors = append(doors, entity.Point{X: x, Y: y})
 			case 'T': // Terminal
@@ -87,7 +87,7 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 // deriveRooms uses a flood-fill algorithm to find contiguous floor areas.
 func (l *JSONMapLoader) deriveRooms(m *Map) {
 	visited := make([]bool, m.Width*m.Height)
-	
+
 	// Create a quick lookup for door locations to use as boundaries
 	isDoor := make([]bool, m.Width*m.Height)
 	for _, d := range m.Doors {
@@ -112,10 +112,18 @@ func (l *JSONMapLoader) deriveRooms(m *Map) {
 					p := queue[0]
 					queue = queue[1:]
 
-					if p.X < minX { minX = p.X }
-					if p.Y < minY { minY = p.Y }
-					if p.X > maxX { maxX = p.X }
-					if p.Y > maxY { maxY = p.Y }
+					if p.X < minX {
+						minX = p.X
+					}
+					if p.Y < minY {
+						minY = p.Y
+					}
+					if p.X > maxX {
+						maxX = p.X
+					}
+					if p.Y > maxY {
+						maxY = p.Y
+					}
 
 					// Check 4 neighbors
 					neighbors := []entity.Point{

@@ -408,7 +408,7 @@ func (e *Engine) renderHUD() {
 	}
 
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
-	e.drawText(2, hudY+5, controls, core.Gray)
+	e.drawText(2, hudY+7, controls, core.Gray)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {

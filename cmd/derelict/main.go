@@ -18,8 +18,8 @@ func main() {
 	flag.Parse()
 
 	mapWidth, mapHeight := 120, 40
-	viewWidth, viewHeight := 80, 25 // Camera sees 80x25 tiles
-	hudHeight := 6
+	viewWidth, viewHeight := 100, 30 // Larger viewport
+	hudHeight := 8                  // More room for messages
 	windowWidth, windowHeight := viewWidth, viewHeight+hudHeight
 
 	cellWidth := int32(10)
