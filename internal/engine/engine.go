@@ -135,17 +135,22 @@ func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
 }
 
 func (e *Engine) launchSelectedMission() {
-	mission := e.Menu.GetSelectedMission()
+	item := e.Menu.GetSelectedItem()
 
 	var loadedMap *world.Map
 	var playerX, playerY int
 
-	if mission.MapFile != "" {
+	if item.Manifest != nil {
 		loader := world.NewJSONMapLoader()
-		var err error
-		loadedMap, playerX, playerY, err = loader.Load(mission.MapFile)
-		if err != nil {
-			loadedMap = nil
+		// Load start level map from mission manifest package
+		for _, lvl := range item.Manifest.Levels {
+			if lvl.ID == item.Manifest.StartLevel {
+				data, err := item.Manifest.LoadLevelMapData(lvl.File)
+				if err == nil {
+					loadedMap, playerX, playerY, _ = loader.LoadBytes(data)
+				}
+				break
+			}
 		}
 	}
 

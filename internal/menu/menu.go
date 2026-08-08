@@ -3,64 +3,70 @@ package menu
 import (
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
+	"github.com/vikash-paf/derelict-facility/internal/mission"
 )
 
-// MissionDef describes a story mission or campaign map.
-type MissionDef struct {
+// MissionItem represents an entry in the Start Menu story selector.
+type MissionItem struct {
 	ID          string
 	Title       string
 	Description string
-	MapFile     string // empty string means procedural generation
-}
-
-// DefaultMissions provides the list of available story missions and sandbox modes.
-var DefaultMissions = []MissionDef{
-	{
-		ID:          "sector_4",
-		Title:       "MISSION 1: SECTOR 4 RESEARCH FACILITY",
-		Description: "Investigate containment breach in the sunlit glass skylight sector.",
-		MapFile:     "test_map.json",
-	},
-	{
-		ID:          "procedural",
-		Title:       "MISSION 2: PROCEDURAL DERELICT RUINS",
-		Description: "Explore an infinite procedurally carved derelict facility layout.",
-		MapFile:     "",
-	},
+	Manifest    *mission.MissionManifest // nil for procedural / sandbox mode
 }
 
 // MenuState manages keyboard navigation and rendering for the game's start menu.
 type MenuState struct {
 	SelectedIndex int
-	Missions      []MissionDef
+	Items         []MissionItem
 }
 
 func NewMenuState() *MenuState {
+	loader := mission.NewMissionLoader()
+	discovered, _ := loader.DiscoverMissions()
+
+	var items []MissionItem
+	for _, m := range discovered {
+		items = append(items, MissionItem{
+			ID:          m.ID,
+			Title:       m.Title,
+			Description: m.Synopsis,
+			Manifest:    &m,
+		})
+	}
+
+	// Always provide infinite procedural sandbox mode as a menu option
+	items = append(items, MissionItem{
+		ID:          "procedural_sandbox",
+		Title:       "PROCEDURAL DERELICT RUINS",
+		Description: "Explore an infinite procedurally carved facility layout.",
+		Manifest:    nil,
+	})
+
 	return &MenuState{
 		SelectedIndex: 0,
-		Missions:      DefaultMissions,
+		Items:         items,
 	}
 }
 
 func (m *MenuState) SelectNext() {
-	if len(m.Missions) == 0 {
+	if len(m.Items) == 0 {
 		return
 	}
-	m.SelectedIndex = (m.SelectedIndex + 1) % len(m.Missions)
+	m.SelectedIndex = (m.SelectedIndex + 1) % len(m.Items)
 }
 
 func (m *MenuState) SelectPrevious() {
-	if len(m.Missions) == 0 {
+	if len(m.Items) == 0 {
 		return
 	}
-	m.SelectedIndex = (m.SelectedIndex - 1 + len(m.Missions)) % len(m.Missions)
+	m.SelectedIndex = (m.SelectedIndex - 1 + len(m.Items)) % len(m.Items)
 }
 
-func (m *MenuState) GetSelectedMission() MissionDef {
-	if m.SelectedIndex < 0 || m.SelectedIndex >= len(m.Missions) {
-		return DefaultMissions[0]
+func (m *MenuState) GetSelectedItem() MissionItem {
+	if m.SelectedIndex < 0 || m.SelectedIndex >= len(m.Items) {
+		return m.Items[0]
 	}
-	return m.Missions[m.SelectedIndex]
+	return m.Items[m.SelectedIndex]
 }
 
 // Render draws the sci-fi retro Main Menu on the display.
@@ -71,11 +77,11 @@ func (m *MenuState) Render(disp display.Display, viewWidth, viewHeight int) {
 
 	// Render Title Header
 	drawCenteredText(disp, centerX, 4, "=== DERELICT FACILITY ===", core.Cyan)
-	drawCenteredText(disp, centerX, 5, "STORY & CAMPAIGN SELECTOR", core.Yellow)
+	drawCenteredText(disp, centerX, 5, "STORY CAMPAIGN & MISSION SELECTOR", core.Yellow)
 
-	// Render Missions List
+	// Render Mission Items List
 	startY := 9
-	for i, mission := range m.Missions {
+	for i, item := range m.Items {
 		lineY := startY + (i * 3)
 		color := core.Gray
 		prefix := "   "
@@ -85,13 +91,13 @@ func (m *MenuState) Render(disp display.Display, viewWidth, viewHeight int) {
 			prefix = "► "
 		}
 
-		drawCenteredText(disp, centerX, lineY, prefix+mission.Title, color)
-		drawCenteredText(disp, centerX, lineY+1, mission.Description, core.DarkGray)
+		drawCenteredText(disp, centerX, lineY, prefix+item.Title, color)
+		drawCenteredText(disp, centerX, lineY+1, item.Description, core.DarkGray)
 	}
 
 	// Render Controls Footer
 	footerY := viewHeight - 4
-	drawCenteredText(disp, centerX, footerY, "[UP / DOWN] Select Mission    [ENTER] Launch Campaign    [Q] Quit", core.Green)
+	drawCenteredText(disp, centerX, footerY, "[UP / DOWN] Select Campaign    [ENTER] Launch Mission    [Q] Quit", core.Green)
 }
 
 func drawCenteredText(disp display.Display, centerX, y int, text string, color core.Color) {

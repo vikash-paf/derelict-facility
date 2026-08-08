@@ -1,0 +1,14 @@
+{
+  "id": "sector_4_incident",
+  "title": "MISSION 1: SECTOR 4 CONTAINMENT BREACH",
+  "author": "System Architect",
+  "synopsis": "Investigate the silent distress beacon from Sector 4 research labs and restore life support.",
+  "start_level": "level_01_surface",
+  "levels": [
+    {
+      "id": "level_01_surface",
+      "name": "Surface Hangar Bay & Sunlit Skylight Corridor",
+      "file": "maps/level_01_surface.json"
+    }
+  ]
+}
