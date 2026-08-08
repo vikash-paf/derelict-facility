@@ -220,6 +220,9 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeySpace) {
 		events = append(events, core.InputEvent{Key: rl.KeyEnter})
 	}
+	if rl.IsKeyPressed(rl.KeyM) {
+		events = append(events, core.InputEvent{Key: rl.KeyM})
+	}
 	return events
 }
 
