@@ -6,6 +6,7 @@ import (
 	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/vikash-paf/derelict-facility/internal/audio"
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
@@ -32,6 +33,7 @@ func (s GameState) Flip() GameState {
 
 type Engine struct {
 	Display    display.Display
+	Audio      *audio.AudioManager
 	Map        *world.Map
 	EcsWorld   *ecs.World // Replaces Player
 	BaseTheme  world.TileVariant
@@ -53,8 +55,12 @@ func NewEngine(
 	startingTheme world.TileVariant,
 	viewWidth, viewHeight int,
 ) *Engine {
+	audioMgr := audio.NewAudioManager()
+	audioMgr.Init()
+
 	e := &Engine{
 		Display:    disp,
+		Audio:      audioMgr,
 		Map:        gameMap,
 		EcsWorld:   ecsWorld,
 		State:      GameStateRunning,
@@ -77,6 +83,8 @@ func NewEngine(
 
 // Run starts the deterministic game loop
 func (e *Engine) Run() error {
+	defer e.Audio.Close()
+
 	for !e.Display.ShouldClose() && e.Running {
 		if e.Display.IsResized() {
 			e.recalculateViewport()
@@ -153,6 +161,8 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		if len(e.Messages) > 3 {
 			e.Messages = e.Messages[1:]
 		}
+	}, func(soundID string) {
+		e.Audio.Play(audio.SoundID(soundID))
 	})
 
 	// Center camera on player
@@ -160,7 +170,9 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
 	if e.tickCount%6 == 0 {
-		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
+		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder, func(soundID string) {
+			e.Audio.Play(audio.SoundID(soundID))
+		})
 	}
 
 	// Calculate sunlight spillover through open doors/corridors

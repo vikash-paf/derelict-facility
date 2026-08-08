@@ -2,6 +2,6 @@ package assets
 
 import "embed"
 
-// AssetsFS embeds only the font files used by the game engine into the compiled binary.
-//go:embed fonts/FiraCodeNFBoldMono.ttf fonts/NotoEmoji-Regular.ttf
+// AssetsFS embeds font and sound effect files used by the game engine into the compiled binary.
+//go:embed fonts/FiraCodeNFBoldMono.ttf fonts/NotoEmoji-Regular.ttf audio/*.wav
 var AssetsFS embed.FS

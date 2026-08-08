@@ -23,7 +23,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string)) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string)) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -59,7 +59,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc)
+				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc, audioFunc)
 			}
 
 			// Don't manually move if Autopilot is running
@@ -76,13 +76,16 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 				if tile != nil && tile.Walkable && !IsSolidAt(w, newX, newY) {
 					positions.X = newX
 					positions.Y = newY
+					if audioFunc != nil {
+						audioFunc("footstep")
+					}
 				}
 			}
 		}
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string)) {
+func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string)) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
@@ -123,6 +126,9 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 							glyph.Char = "X"
 						}
 					}
+					if audioFunc != nil {
+						audioFunc("generator_toggle")
+					}
 					logFunc("Power Generator toggled.")
 					return
 				}
@@ -133,6 +139,9 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 
 					// Check security clearance
 					if door.RequiredClearance != 0 && (playerClearance&door.RequiredClearance) == 0 {
+						if audioFunc != nil {
+							audioFunc("access_denied")
+						}
 						logFunc("ACCESS DENIED: Required Clearance Missing.")
 						return
 					}
@@ -146,6 +155,9 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 							w.Glyphs[i].Char = "/"
 							w.Glyphs[i].Color = core.Gray
 						}
+						if audioFunc != nil {
+							audioFunc("door_open")
+						}
 						logFunc("Door opened.")
 					} else {
 						w.AddSolid(i)
@@ -153,6 +165,9 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 						if (w.Masks[i] & components.MaskGlyph) != 0 {
 							w.Glyphs[i].Char = "+"
 							w.Glyphs[i].Color = core.White
+						}
+						if audioFunc != nil {
+							audioFunc("door_close")
 						}
 						logFunc("Door closed.")
 					}
@@ -162,6 +177,10 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 				// 3. Terminal
 				if (w.Masks[i] & components.MaskTerminal) != 0 {
 					terminal := &w.Terminals[i]
+
+					if audioFunc != nil {
+						audioFunc("terminal_access")
+					}
 
 					// Grant clearance if terminal has it
 					if terminal.GrantClearance != 0 && foundPlayer {
