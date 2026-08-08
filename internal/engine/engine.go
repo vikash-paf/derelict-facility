@@ -315,7 +315,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 
 				if tile.IsSunlit {
 					sunColor := e.Clock.GetSunlightColor()
-					color = core.LerpColor(color, sunColor, 0.45)
+					color = core.LerpColor(color, sunColor, 0.75)
 				}
 
 				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
