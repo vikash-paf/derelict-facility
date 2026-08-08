@@ -39,10 +39,16 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		fontChars = append(fontChars, extraChars...)
 
 		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
-		rl.SetTextureFilter(r.Font.Texture, rl.FilterPoint) // Pixel perfect text
+		if r.Font.Texture.ID == 0 || r.Font.BaseSize == 0 {
+			// Asset font not found, fall back to default raylib font
+			r.Font = rl.GetFontDefault()
+			r.FontPath = ""
+		} else {
+			rl.SetTextureFilter(r.Font.Texture, rl.FilterPoint) // Pixel perfect text
 
-		fallbackPath := "assets/fonts/NotoEmoji-Regular.ttf"
-		r.FallbackFont = rl.LoadFontEx(fallbackPath, r.FontSize, fontChars)
+			fallbackPath := "assets/fonts/NotoEmoji-Regular.ttf"
+			r.FallbackFont = rl.LoadFontEx(fallbackPath, r.FontSize, fontChars)
+		}
 	} else {
 		r.Font = rl.GetFontDefault()
 	}
