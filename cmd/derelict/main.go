@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
@@ -58,12 +59,14 @@ func main() {
 			var err error
 			generatedMap, playerX, playerY, err = loader.Load(targetMapFile)
 			if err != nil {
-				panic(fmt.Sprintf("Failed to load map from %s: %v", targetMapFile, err))
+				fmt.Printf("Warning: Could not load JSON map %s (%v). Falling back to procedural map generation...\n", targetMapFile, err)
+				generatedMap = nil
 			}
-		} else {
-			// 2. Build the world map FIRST
-			// seed := time.Now().UnixNano()
-			seed := 12345
+		}
+
+		if generatedMap == nil {
+			// Build the procedural facility map
+			seed := time.Now().UnixNano()
 			generator := world.NewFacilityGenerator(uint64(seed))
 			generatedMap, playerX, playerY = generator.Generate(mapWidth, mapHeight)
 			if generatedMap == nil {
