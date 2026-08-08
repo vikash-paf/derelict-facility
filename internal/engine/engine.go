@@ -734,14 +734,13 @@ func (e *Engine) renderHUD() {
 	}
 
 	muteLabel := "[M] Mute"
+	controlsColor := core.Gray
 	if e.Audio.IsMuted() {
 		muteLabel = "[M] MUTED"
+		controlsColor = core.Red
 	}
 	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [ESC] Pause    [Q] Abort", muteLabel)
-	e.drawText(2, hudY+7, controls, core.Gray)
-	if e.Audio.IsMuted() {
-		e.drawText(2, hudY+7, "[M] MUTED", core.Red)
-	}
+	e.drawText(2, hudY+7, controls, controlsColor)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
