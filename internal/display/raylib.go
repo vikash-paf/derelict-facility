@@ -9,22 +9,50 @@ import (
 )
 
 type RaylibDisplay struct {
-	CellWidth    int32
-	CellHeight   int32
-	FontSize     int32
-	FontPath     string
-	Font         rl.Font
-	FallbackFont rl.Font
-	Tileset      rl.Texture2D
+	BaseCellWidth  int32
+	BaseCellHeight int32
+	BaseFontSize   int32
+	CellWidth      int32
+	CellHeight     int32
+	FontSize       int32
+	Scale          float32
+	FontPath       string
+	Font           rl.Font
+	FallbackFont   rl.Font
+	Tileset        rl.Texture2D
 }
 
 func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *RaylibDisplay {
 	return &RaylibDisplay{
-		CellWidth:  cellWidth,
-		CellHeight: cellHeight,
-		FontSize:   fontSize,
-		FontPath:   fontPath,
+		BaseCellWidth:  cellWidth,
+		BaseCellHeight: cellHeight,
+		BaseFontSize:   fontSize,
+		CellWidth:      cellWidth,
+		CellHeight:     cellHeight,
+		FontSize:       fontSize,
+		Scale:          1.0,
+		FontPath:       fontPath,
 	}
+}
+
+func (r *RaylibDisplay) SetScale(scale float32) {
+	if scale < 0.5 {
+		scale = 0.5
+	}
+	if scale > 3.0 {
+		scale = 3.0
+	}
+	r.Scale = scale
+	r.CellWidth = int32(float32(r.BaseCellWidth) * scale)
+	r.CellHeight = int32(float32(r.BaseCellHeight) * scale)
+	r.FontSize = int32(float32(r.BaseFontSize) * scale)
+}
+
+func (r *RaylibDisplay) GetScale() float32 {
+	if r.Scale <= 0 {
+		r.Scale = 1.0
+	}
+	return r.Scale
 }
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
@@ -176,6 +204,12 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	}
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		events = append(events, core.InputEvent{Key: rl.KeyEscape})
+	}
+	if rl.IsKeyPressed(rl.KeyEqual) || rl.IsKeyPressed(rl.KeyKpAdd) { // '+' or '='
+		events = append(events, core.InputEvent{Key: rl.KeyEqual})
+	}
+	if rl.IsKeyPressed(rl.KeyMinus) || rl.IsKeyPressed(rl.KeyKpSubtract) { // '-'
+		events = append(events, core.InputEvent{Key: rl.KeyMinus})
 	}
 	return events
 }

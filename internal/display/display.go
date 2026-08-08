@@ -17,4 +17,6 @@ type Display interface {
 	PollInput() []core.InputEvent
 	GetDimensions() (int, int)
 	IsResized() bool
+	SetScale(scale float32)
+	GetScale() float32
 }

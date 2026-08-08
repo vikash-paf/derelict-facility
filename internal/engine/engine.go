@@ -79,12 +79,7 @@ func NewEngine(
 func (e *Engine) Run() error {
 	for !e.Display.ShouldClose() && e.Running {
 		if e.Display.IsResized() {
-			gw, gh := e.Display.GetDimensions()
-			hudHeight := 8
-			if gh > hudHeight {
-				e.Camera.Width = gw
-				e.Camera.Height = gh - hudHeight
-			}
+			e.recalculateViewport()
 		}
 
 		events := e.Display.PollInput()
@@ -109,6 +104,28 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 		if event.Key == rl.KeyEscape {
 			e.State = e.State.Flip()
 		}
+		if event.Key == rl.KeyEqual { // '+' key to Zoom In
+			currentScale := e.Display.GetScale()
+			e.Display.SetScale(currentScale + 0.25)
+			e.recalculateViewport()
+		}
+		if event.Key == rl.KeyMinus { // '-' key to Zoom Out
+			currentScale := e.Display.GetScale()
+			e.Display.SetScale(currentScale - 0.25)
+			e.recalculateViewport()
+		}
+	}
+}
+
+func (e *Engine) recalculateViewport() {
+	gw, gh := e.Display.GetDimensions()
+	hudHeight := 8
+	if gh > hudHeight {
+		e.Camera.Width = gw
+		e.Camera.Height = gh - hudHeight
+	} else {
+		e.Camera.Width = gw
+		e.Camera.Height = gh
 	}
 }
 
@@ -427,7 +444,7 @@ func (e *Engine) renderHUD() {
 		e.drawText(2, hudY+2+i, "> "+msg, color)
 	}
 
-	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
+	controls := " [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    [ESC] Pause    [Q] Abort"
 	e.drawText(2, hudY+7, controls, core.Gray)
 }
 
