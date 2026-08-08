@@ -39,3 +39,7 @@ func (r Rect) Intersects(other Rect) bool {
 
 	return overlapX && overlapY
 }
+
+func (r Rect) Contains(x, y int) bool {
+	return x >= r.X1 && x <= r.X2 && y >= r.Y1 && y <= r.Y2
+}

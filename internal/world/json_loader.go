@@ -37,7 +37,7 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 	playerX, playerY := mapData.Width/2, mapData.Height/2
 	var doors []entity.Point
 	var terminals []entity.Point
-	var generators []entity.Point
+	var generators []GeneratorInfo
 
 	for y, row := range mapData.Rows {
 		if y >= mapData.Height {
@@ -53,15 +53,20 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
 			case '.': // Floor
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+			case 'S', '*': // Skylight Glass Roof Floor
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, IsSunlit: true, Variant: 1})
 			case '+': // Door
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				doors = append(doors, entity.Point{X: x, Y: y})
 			case 'T': // Terminal
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				terminals = append(terminals, entity.Point{X: x, Y: y})
-			case 'G': // Power Generator
+			case 'G': // Global Power Generator
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
-				generators = append(generators, entity.Point{X: x, Y: y})
+				generators = append(generators, GeneratorInfo{Pos: entity.Point{X: x, Y: y}, IsGlobal: true})
+			case 'g': // Local Room Power Generator
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				generators = append(generators, GeneratorInfo{Pos: entity.Point{X: x, Y: y}, IsGlobal: false})
 			case '@': // Player start position
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				playerX, playerY = x, y

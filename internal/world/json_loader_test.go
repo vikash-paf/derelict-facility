@@ -12,9 +12,9 @@ func TestJSONMapLoader(t *testing.T) {
 		"height": 5,
 		"rows": [
 			"##########",
-			"#@...T...#",
+			"#@..ST...#",
 			"#.####+###",
-			"#..G.....#",
+			"#..G...g.#",
 			"##########"
 		]
 	}`
@@ -46,7 +46,21 @@ func TestJSONMapLoader(t *testing.T) {
 	if len(m.Terminals) != 1 {
 		t.Errorf("expected 1 terminal, got %d", len(m.Terminals))
 	}
-	if len(m.PowerGenerators) != 1 {
-		t.Errorf("expected 1 power generator, got %d", len(m.PowerGenerators))
+	if len(m.PowerGenerators) != 2 {
+		t.Errorf("expected 2 power generators, got %d", len(m.PowerGenerators))
+	}
+
+	// Verify global vs local generator flags
+	if !m.PowerGenerators[0].IsGlobal {
+		t.Errorf("expected first generator 'G' to be global")
+	}
+	if m.PowerGenerators[1].IsGlobal {
+		t.Errorf("expected second generator 'g' to be room local")
+	}
+
+	// Verify skylight tile 'S'
+	skylightTile := m.GetTile(4, 1)
+	if skylightTile == nil || !skylightTile.IsSunlit {
+		t.Errorf("expected tile at (4,1) to be IsSunlit=true")
 	}
 }

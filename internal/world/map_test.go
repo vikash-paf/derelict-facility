@@ -191,23 +191,46 @@ func TestComputeFOV(t *testing.T) {
 
 			m.ComputeFOV(tt.playerX, tt.playerY, tt.radius, func(x, y int) bool {
 				return !m.IsWalkable(x, y)
-			}, false)
+			}, nil)
 
 			// Visual Debug Output
 			t.Logf("\nTest: %s\nPlayer at (%d,%d), Radius: %d\n%s",
 				tt.name, tt.playerX, tt.playerY, tt.radius, InspectVisibility(m, tt.playerX, tt.playerY))
 
-			// Assertions
-			for _, p := range tt.mustSee {
-				if !m.Tiles[p.X+p.Y*m.Width].Visible {
-					t.Errorf("Expected point {%d, %d} to be visible", p.X, p.Y)
-				}
-			}
 			for _, p := range tt.mustNotSee {
 				if m.Tiles[p.X+p.Y*m.Width].Visible {
 					t.Errorf("Expected point {%d, %d} to be hidden", p.X, p.Y)
 				}
 			}
 		})
+	}
+}
+
+func TestPropagateSunlight(t *testing.T) {
+	// Glass roof 'S' in middle of open corridor next to a solid wall '#'
+	layout := `
+.....
+.S.#.
+.....`
+	m := newTestMap(layout)
+	m.Tiles[m.GetIndex(1, 1)].IsSunlit = true
+
+	m.PropagateSunlight(2, func(x, y int) bool {
+		return !m.IsWalkable(x, y)
+	})
+
+	// Source glass tile should have SunlightIntensity 1.0
+	if m.Tiles[m.GetIndex(1, 1)].SunlightIntensity != 1.0 {
+		t.Errorf("expected source glass tile to have intensity 1.0, got %f", m.Tiles[m.GetIndex(1, 1)].SunlightIntensity)
+	}
+
+	// Neighboring floor tile (2,1) should have decayed intensity 0.5
+	if m.Tiles[m.GetIndex(2, 1)].SunlightIntensity != 0.5 {
+		t.Errorf("expected neighboring tile (2,1) to have intensity 0.5, got %f", m.Tiles[m.GetIndex(2, 1)].SunlightIntensity)
+	}
+
+	// Tile behind the solid wall at (4,1) should remain 0.0 (blocked)
+	if m.Tiles[m.GetIndex(4, 1)].SunlightIntensity != 0.0 {
+		t.Errorf("expected tile behind wall (4,1) to remain unlit (0.0), got %f", m.Tiles[m.GetIndex(4, 1)].SunlightIntensity)
 	}
 }

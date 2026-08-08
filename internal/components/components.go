@@ -90,7 +90,9 @@ type Interactable struct {
 
 // PowerGenerator is a specific interactive device state.
 type PowerGenerator struct {
-	IsActive bool
+	IsActive  bool
+	IsGlobal  bool // true for Global Generator ('G'), false for Room Generator ('g')
+	RoomIndex int  // index of room it powers when IsGlobal is false (-1 for global)
 }
 
 // Door represents a mechanism that can block movement and vision.

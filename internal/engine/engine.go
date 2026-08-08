@@ -37,6 +37,7 @@ type Engine struct {
 	BaseTheme  world.TileVariant
 	TickerRate time.Duration
 	tickCount  int
+	Clock      *world.FacilityClock
 	State      GameState
 	Running    bool
 	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
@@ -60,6 +61,7 @@ func NewEngine(
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
+		Clock:      world.NewFacilityClock(),
 		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
 		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 		Camera: &core.Camera{
@@ -77,12 +79,7 @@ func NewEngine(
 func (e *Engine) Run() error {
 	for !e.Display.ShouldClose() && e.Running {
 		if e.Display.IsResized() {
-			gw, gh := e.Display.GetDimensions()
-			hudHeight := 8
-			if gh > hudHeight {
-				e.Camera.Width = gw
-				e.Camera.Height = gh - hudHeight
-			}
+			e.recalculateViewport()
 		}
 
 		events := e.Display.PollInput()
@@ -107,6 +104,28 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 		if event.Key == rl.KeyEscape {
 			e.State = e.State.Flip()
 		}
+		if event.Key == rl.KeyEqual { // '+' key to Zoom In
+			currentScale := e.Display.GetScale()
+			e.Display.SetScale(currentScale + 0.25)
+			e.recalculateViewport()
+		}
+		if event.Key == rl.KeyMinus { // '-' key to Zoom Out
+			currentScale := e.Display.GetScale()
+			e.Display.SetScale(currentScale - 0.25)
+			e.recalculateViewport()
+		}
+	}
+}
+
+func (e *Engine) recalculateViewport() {
+	gw, gh := e.Display.GetDimensions()
+	hudHeight := 8
+	if gh > hudHeight {
+		e.Camera.Width = gw
+		e.Camera.Height = gh - hudHeight
+	} else {
+		e.Camera.Width = gw
+		e.Camera.Height = gh
 	}
 }
 
@@ -116,8 +135,8 @@ func (e *Engine) Update(events []core.InputEvent) {
 	switch e.State {
 	case GameStatePaused:
 		// do nothing, the world is frozen
-		// later: implement it to save the game
 	case GameStateRunning:
+		e.Clock.Tick()
 		e.processSimulation(events)
 	}
 }
@@ -144,7 +163,10 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
-	powerOn := systems.IsPowerActive(e.EcsWorld)
+	// Calculate sunlight spillover through open doors/corridors
+	e.Map.PropagateSunlight(3, func(x, y int) bool {
+		return systems.IsSolidAt(e.EcsWorld, x, y)
+	})
 
 	// Calculate FOV
 	targetMask := components.MaskPlayerControl | components.MaskPosition
@@ -159,7 +181,15 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 				}
 				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
-			}, powerOn)
+			}, func(x, y int) bool {
+				// Lit by power grid generator OR lit by natural daytime skylight (including spillover)
+				isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+				if isPowered {
+					return true
+				}
+				tile := e.Map.GetTile(x, y)
+				return tile != nil && tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+			})
 			break // Compute FOV for the first player found
 		}
 	}
@@ -247,8 +277,6 @@ func (e *Engine) renderPauseMenu() {
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	clear(e.PathLookup)
 
-	powerOn := systems.IsPowerActive(e.EcsWorld)
-
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
 	targetMask := components.MaskPlayerControl
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
@@ -288,14 +316,24 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile.Visible {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
+				// Draw floor tile background fill using ambient daylight color
 				if tile.Type == world.TileTypeFloor {
-					switch tile.Variant {
-					case 1: char = "."
-					case 2: char = ","
-					case 3: char = "`"
-					case 4: char = "'"
-					default: char = " "
+					bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
+					sunColor := e.Clock.GetSunlightColor()
+					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+						blendWeight := 0.40 * tile.SunlightIntensity
+						bgColor = core.LerpColor(bgColor, sunColor, blendWeight)
 					}
+
+					isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+					isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+					if !isTilePowered && !isSunlitByDay {
+						if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
+						if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
+					}
+
+					e.Display.DrawRect(screenX, screenY, bgColor)
+					continue
 				}
 
 				if tile.Type == world.TileTypeWall {
@@ -315,9 +353,17 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 						case 15: char = "╬"
 						}
 					}
+
+					sunColor := e.Clock.GetSunlightColor()
+					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+						blendWeight := 0.45 * tile.SunlightIntensity
+						color = core.LerpColor(color, sunColor, blendWeight)
+					}
 				}
 
-				if !powerOn {
+				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+				isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+				if !isTilePowered && !isSunlitByDay {
 					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
 					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
 				}
@@ -327,16 +373,11 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			if tile.Explored {
-				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 				if tile.Type == world.TileTypeFloor {
-					switch tile.Variant {
-					case 1: char = "."
-					case 2: char = ","
-					case 3: char = "`"
-					case 4: char = "'"
-					default: char = " "
-					}
+					e.Display.DrawRect(screenX, screenY, core.Color{R: 8, G: 8, B: 12, A: 255})
+					continue
 				}
+				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 				if tile.Type == world.TileTypeWall {
 					if char == "╬" || char == "#" || char == "█" || char == "▓" {
 						switch tile.Bitmask {
@@ -404,12 +445,12 @@ func (e *Engine) renderHUD() {
 		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
-	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
-	cycleX := e.Camera.Width - len(cycleText) - 5
-	if cycleX < 55 {
-		cycleX = 55
+	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
+	clockX := e.Camera.Width - len(clockText) - 8
+	if clockX < 55 {
+		clockX = 55
 	}
-	e.drawText(cycleX, hudY+1, cycleText, core.White)
+	e.drawText(clockX, hudY+1, clockText, core.Yellow)
 
 	if interactPrompt != "" {
 		if e.tickCount%30 < 15 {
@@ -424,7 +465,7 @@ func (e *Engine) renderHUD() {
 		e.drawText(2, hudY+2+i, "> "+msg, color)
 	}
 
-	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
+	controls := " [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    [ESC] Pause    [Q] Abort"
 	e.drawText(2, hudY+7, controls, core.Gray)
 }
 

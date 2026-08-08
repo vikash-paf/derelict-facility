@@ -192,15 +192,43 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 	}
 }
 
-// IsPowerActive returns true if at least one generator is currently active
+// IsPowerActive returns true if at least one global generator is active.
 func IsPowerActive(w *ecs.World) bool {
 	targetMask := components.MaskPowerGenerator
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (w.Masks[i] & targetMask) == targetMask {
-			if w.PowerGenerators[i].IsActive {
+			gen := w.PowerGenerators[i]
+			if gen.IsActive && gen.IsGlobal {
 				return true
 			}
 		}
 	}
+	return false
+}
+
+// IsPowerActiveAt returns true if the global power is active OR if an active local generator powers the room containing (x,y).
+func IsPowerActiveAt(w *ecs.World, gameMap *world.Map, x, y int) bool {
+	if IsPowerActive(w) {
+		return true
+	}
+
+	targetMask := components.MaskPosition | components.MaskPowerGenerator
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (w.Masks[i] & targetMask) == targetMask {
+			gen := w.PowerGenerators[i]
+			if !gen.IsActive || gen.IsGlobal {
+				continue
+			}
+
+			// Local generator: check if the generator is in the same room as (x,y)
+			genPos := w.Positions[i]
+			for _, room := range gameMap.Rooms {
+				if room.Contains(genPos.X, genPos.Y) && room.Contains(x, y) {
+					return true
+				}
+			}
+		}
+	}
+
 	return false
 }
