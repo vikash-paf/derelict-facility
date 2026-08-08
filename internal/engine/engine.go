@@ -402,7 +402,7 @@ func (e *Engine) renderHUD() {
 	}
 
 	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
-	clockX := e.Camera.Width - len(clockText) - 2
+	clockX := e.Camera.Width - len(clockText) - 8
 	if clockX < 55 {
 		clockX = 55
 	}
