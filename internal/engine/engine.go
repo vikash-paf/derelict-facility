@@ -163,6 +163,11 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
+	// Calculate sunlight spillover through open doors/corridors
+	e.Map.PropagateSunlight(3, func(x, y int) bool {
+		return systems.IsSolidAt(e.EcsWorld, x, y)
+	})
+
 	// Calculate FOV
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
@@ -177,13 +182,13 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
 			}, func(x, y int) bool {
-				// Lit by power grid generator OR lit by natural daytime skylight
+				// Lit by power grid generator OR lit by natural daytime skylight (including spillover)
 				isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
 				if isPowered {
 					return true
 				}
 				tile := e.Map.GetTile(x, y)
-				return tile != nil && tile.IsSunlit && e.Clock.IsDaytime()
+				return tile != nil && tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 			})
 			break // Compute FOV for the first player found
 		}
@@ -315,14 +320,13 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				if tile.Type == world.TileTypeFloor {
 					bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
 					sunColor := e.Clock.GetSunlightColor()
-					if tile.IsSunlit {
-						bgColor = core.LerpColor(bgColor, sunColor, 0.40)
-					} else if e.Clock.IsDaytime() {
-						bgColor = core.LerpColor(bgColor, sunColor, 0.15)
+					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+						blendWeight := 0.40 * tile.SunlightIntensity
+						bgColor = core.LerpColor(bgColor, sunColor, blendWeight)
 					}
 
 					isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-					isSunlitByDay := tile.IsSunlit && e.Clock.IsDaytime()
+					isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 					if !isTilePowered && !isSunlitByDay {
 						if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
 						if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
@@ -351,15 +355,14 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 
 					sunColor := e.Clock.GetSunlightColor()
-					if tile.IsSunlit {
-						color = core.LerpColor(color, sunColor, 0.45)
-					} else if e.Clock.IsDaytime() {
-						color = core.LerpColor(color, sunColor, 0.20)
+					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+						blendWeight := 0.45 * tile.SunlightIntensity
+						color = core.LerpColor(color, sunColor, blendWeight)
 					}
 				}
 
 				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-				isSunlitByDay := tile.IsSunlit && e.Clock.IsDaytime()
+				isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 				if !isTilePowered && !isSunlitByDay {
 					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
 					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }

@@ -131,3 +131,66 @@ func (m *Map) castRay(x1, y1, x2, y2 int, blocksLight func(x, y int) bool) {
 		return true // continue drawing the line
 	})
 }
+
+// PropagateSunlight uses BFS to spill sunlight from glass roof tiles into nearby open floor tiles.
+func (m *Map) PropagateSunlight(maxSpillRadius int, isSolid func(x, y int) bool) {
+	type lightNode struct {
+		x, y  int
+		dist  int
+		intensity float64
+	}
+
+	queue := []lightNode{}
+	visited := make(map[int]float64)
+
+	// Seed BFS with all glass roof tiles (IsSunlit == true)
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			idx := m.GetIndex(x, y)
+			tile := &m.Tiles[idx]
+			if tile.IsSunlit {
+				tile.SunlightIntensity = 1.0
+				queue = append(queue, lightNode{x: x, y: y, dist: 0, intensity: 1.0})
+				visited[idx] = 1.0
+			} else {
+				tile.SunlightIntensity = 0.0
+			}
+		}
+	}
+
+	// BFS outward spillover through unblocked tiles
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+
+		if curr.dist >= maxSpillRadius {
+			continue
+		}
+
+		neighbors := [4][2]int{
+			{curr.x + 1, curr.y}, {curr.x - 1, curr.y},
+			{curr.x, curr.y + 1}, {curr.x, curr.y - 1},
+		}
+
+		nextIntensity := curr.intensity * 0.5 // Decays by 50% per step
+
+		for _, n := range neighbors {
+			nx, ny := n[0], n[1]
+			if nx < 0 || nx >= m.Width || ny < 0 || ny >= m.Height {
+				continue
+			}
+
+			// Sunlight cannot spill through solid walls or closed doors
+			if !m.IsWalkable(nx, ny) || (isSolid != nil && isSolid(nx, ny)) {
+				continue
+			}
+
+			nIdx := m.GetIndex(nx, ny)
+			if prevIntensity, exists := visited[nIdx]; !exists || nextIntensity > prevIntensity {
+				visited[nIdx] = nextIntensity
+				m.Tiles[nIdx].SunlightIntensity = nextIntensity
+				queue = append(queue, lightNode{x: nx, y: ny, dist: curr.dist + 1, intensity: nextIntensity})
+			}
+		}
+	}
+}
