@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/vikash-paf/derelict-facility/internal/components"
+	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 	"github.com/vikash-paf/derelict-facility/internal/world"
@@ -37,14 +38,29 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder, au
 					start := entity.Point{X: pos.X, Y: pos.Y}
 					target := entity.Point{X: targetX, Y: targetY}
 
-					// Calculate the path
+					// Calculate the path (doors count as walkable if unlocked)
 					path := pf.FindPath(gameMap, start, target, func(x, y int) bool {
-						// 1. Is the map tile walkable?
 						if !gameMap.IsWalkable(x, y) {
 							return false
 						}
-						// 2. Is there a solid entity blocking the way?
-						return !IsSolidAt(w, x, y)
+						// Solid check: if there is a solid entity, check if it's an unlocked door
+						targetMask := components.MaskPosition | components.MaskSolid
+						for eID := ecs.Entity(0); eID < ecs.MaxEntities; eID++ {
+							if (w.Masks[eID] & targetMask) == targetMask {
+								solidPos := w.Positions[eID]
+								if solidPos.X == x && solidPos.Y == y {
+									// Check if it's a door
+									if (w.Masks[eID] & components.MaskDoor) != 0 {
+										door := w.Doors[eID]
+										if door.RequiredClearance == 0 || (ctrl.SecurityClearance&door.RequiredClearance) != 0 {
+											return true // Autopilot can open unlocked doors!
+										}
+									}
+									return false // Solid obstacle or locked door
+								}
+							}
+						}
+						return true
 					})
 
 					if len(path) > 1 {
@@ -60,6 +76,32 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder, au
 
 			// 2. Take the next step in the path
 			nextStep := ctrl.CurrentPath[0]
+
+			// Check if next step is a closed door and auto-open it
+			doorMask := components.MaskPosition | components.MaskDoor
+			for eID := ecs.Entity(0); eID < ecs.MaxEntities; eID++ {
+				if (w.Masks[eID] & doorMask) == doorMask {
+					doorPos := w.Positions[eID]
+					if doorPos.X == nextStep.X && doorPos.Y == nextStep.Y {
+						door := &w.Doors[eID]
+						if !door.IsOpen {
+							if door.RequiredClearance == 0 || (ctrl.SecurityClearance&door.RequiredClearance) != 0 {
+								door.IsOpen = true
+								w.RemoveSolid(eID)
+								w.Interactables[eID].Prompt = "Press [E] to Close Door"
+								if (w.Masks[eID] & components.MaskGlyph) != 0 {
+									w.Glyphs[eID].Char = "/"
+									w.Glyphs[eID].Color = core.Gray
+								}
+								if audioFunc != nil {
+									audioFunc("door_open")
+								}
+							}
+						}
+						break
+					}
+				}
+			}
 
 			if gameMap.IsWalkable(nextStep.X, nextStep.Y) && !IsSolidAt(w, nextStep.X, nextStep.Y) {
 				pos.X = nextStep.X
