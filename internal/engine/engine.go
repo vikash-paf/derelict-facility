@@ -160,7 +160,13 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
 			}, func(x, y int) bool {
-				return systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+				// Lit by power grid generator OR lit by natural daytime skylight
+				isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+				if isPowered {
+					return true
+				}
+				tile := e.Map.GetTile(x, y)
+				return tile != nil && tile.IsSunlit && e.Clock.IsDaytime()
 			})
 			break // Compute FOV for the first player found
 		}
@@ -319,7 +325,8 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				}
 
 				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-				if !isTilePowered && !tile.IsSunlit {
+				isSunlitByDay := tile.IsSunlit && e.Clock.IsDaytime()
+				if !isTilePowered && !isSunlitByDay {
 					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
 					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
 				}

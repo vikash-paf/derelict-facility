@@ -109,6 +109,13 @@ func (c *FacilityClock) FormatTime() string {
 	return fmt.Sprintf("%02d:%02d %s | DAY %02d | %s", displayHour, m, ampm, c.Day, c.Season)
 }
 
+// IsDaytime returns true if the current time falls between seasonal sunrise and sunset.
+func (c *FacilityClock) IsDaytime() bool {
+	config := SeasonConfigs[c.Season]
+	h := c.Hour()
+	return h >= config.SunriseHour && h < config.SunsetHour
+}
+
 // GetSunlightColor returns the current ambient sunlight color based on season and time.
 func (c *FacilityClock) GetSunlightColor() core.Color {
 	config := SeasonConfigs[c.Season]
