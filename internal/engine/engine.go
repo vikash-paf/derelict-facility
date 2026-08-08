@@ -143,7 +143,7 @@ func (e *Engine) launchSelectedMission() {
 	if item.Manifest != nil {
 		e.ActiveMission = item.Manifest
 		e.ActiveLevelID = item.Manifest.StartLevel
-		e.loadLevelByID(e.ActiveLevelID, 0)
+		e.loadLevelByID(e.ActiveLevelID, 0, false) // false = arriving at start, use @ marker
 		return
 	}
 
@@ -159,7 +159,9 @@ func (e *Engine) launchSelectedMission() {
 
 // loadLevelByID loads a specific level from the active mission manifest, preserving
 // the player's current security clearance across the transition.
-func (e *Engine) loadLevelByID(levelID string, existingClearance uint32) {
+// goingUp indicates whether the player arrived via an ascending (<) or descending (>) elevator,
+// which determines which elevator in the destination they spawn next to.
+func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool) {
 	if e.ActiveMission == nil {
 		return
 	}
@@ -176,14 +178,19 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32) {
 		}
 
 		loader := world.NewJSONMapLoader()
-		loadedMap, playerX, playerY, err := loader.LoadBytes(data)
+		loadedMap, defaultX, defaultY, err := loader.LoadBytes(data)
 		if err != nil {
 			e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Cannot parse level %s", levelID))
 			return
 		}
 
+		// Spawn player at the arrival elevator, not at the @ marker.
+		// Going DOWN via > → arrive at the < elevator (IsUp=true) in destination.
+		// Going UP via < → arrive at the > elevator (IsUp=false) in destination.
+		spawnX, spawnY := arrivalSpawnPos(loadedMap, goingUp, defaultX, defaultY)
+
 		e.ActiveLevelID = levelID
-		e.activateMap(loadedMap, playerX, playerY, e.ActiveMission, levelID)
+		e.activateMap(loadedMap, spawnX, spawnY, e.ActiveMission, levelID)
 		if existingClearance != 0 {
 			e.transferPlayerClearance(existingClearance)
 		}
@@ -192,6 +199,20 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32) {
 	}
 
 	e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Level %q not found in mission", levelID))
+}
+
+// arrivalSpawnPos finds the elevator in the destination map that the player steps out of.
+// goingUp=true means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
+// goingUp=false means player rode UP (<) so they arrive at the > elevator (IsUp=false).
+// Falls back to the map's @ marker position if no matching elevator exists.
+func arrivalSpawnPos(gameMap *world.Map, goingUp bool, fallbackX, fallbackY int) (int, int) {
+	for _, s := range gameMap.Stairways {
+		if s.IsUp == goingUp {
+			// Spawn one tile away from the elevator so the player isn't on top of it
+			return s.Pos.X + 1, s.Pos.Y
+		}
+	}
+	return fallbackX, fallbackY
 }
 
 // activateMap swaps out the engine's active map, rebuilds pathfinding, and constructs the ECS world.
@@ -406,8 +427,8 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		}
 	}, func(soundID string) {
 		e.Audio.Play(audio.SoundID(soundID))
-	}, func(targetLevelID string) {
-		e.loadLevelByID(targetLevelID, clearanceBefore)
+	}, func(targetLevelID string, goingUp bool) {
+		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp)
 	})
 
 	// Center camera on player

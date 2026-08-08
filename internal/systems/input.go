@@ -25,7 +25,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string)) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -87,7 +87,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string)) {
+func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
@@ -226,13 +226,13 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 					if audioFunc != nil {
 						audioFunc("terminal_access")
 					}
-					direction := "Descending"
+					dirLabel := "Descending"
 					if stair.IsUp {
-						direction = "Ascending"
+						dirLabel = "Ascending"
 					}
-					logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", direction, stair.TargetLevelID))
+					logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", dirLabel, stair.TargetLevelID))
 					if transitionFunc != nil {
-						transitionFunc(stair.TargetLevelID)
+						transitionFunc(stair.TargetLevelID, stair.IsUp)
 					}
 					return
 				}
