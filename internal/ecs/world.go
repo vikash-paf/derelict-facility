@@ -25,6 +25,7 @@ type World struct {
 	PowerGenerators [MaxEntities]components.PowerGenerator
 	Doors           [MaxEntities]components.Door
 	Terminals       [MaxEntities]components.Terminal
+	Narratives      [MaxEntities]components.Narrative
 }
 
 func NewWorld() *World {
@@ -105,6 +106,12 @@ func (w *World) AddDoor(e Entity, door components.Door) {
 func (w *World) AddTerminal(entity Entity, terminal components.Terminal) {
 	w.Masks[entity] |= components.MaskTerminal
 	w.Terminals[entity] = terminal
+}
+
+// AddNarrative adds a Narrative component to an entity.
+func (w *World) AddNarrative(entity Entity, narrative components.Narrative) {
+	w.Masks[entity] |= components.MaskNarrative
+	w.Narratives[entity] = narrative
 }
 
 // RemoveTerminal removes the Terminal component from an entity.

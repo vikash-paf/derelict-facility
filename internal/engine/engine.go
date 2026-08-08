@@ -41,6 +41,8 @@ type Engine struct {
 	Running    bool
 	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
 	Pathfinder *world.Pathfinder
+	Messages   []string
+	Camera     *core.Camera
 }
 
 func NewEngine(
@@ -48,6 +50,7 @@ func NewEngine(
 	gameMap *world.Map,
 	ecsWorld *ecs.World,
 	startingTheme world.TileVariant,
+	viewWidth, viewHeight int,
 ) *Engine {
 	e := &Engine{
 		Display:    disp,
@@ -59,6 +62,12 @@ func NewEngine(
 		BaseTheme:  startingTheme,
 		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
 		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
+		Camera: &core.Camera{
+			X:      0,
+			Y:      0,
+			Width:  viewWidth,
+			Height: viewHeight,
+		},
 	}
 
 	return e
@@ -104,13 +113,22 @@ func (e *Engine) Update(events []core.InputEvent) {
 	}
 }
 
-func (e *Engine) processAutopilot() {
-	// Replaced by systems.ProcessAutopilot
-}
-
 func (e *Engine) processSimulation(events []core.InputEvent) {
 	// Let the systems tick using the events we polled at the start of the frame!
-	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map)
+	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, func(msg string) {
+		// If the new message is the same as the last one, don't repeat it
+		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
+			return
+		}
+		e.Messages = append(e.Messages, msg)
+		// Limit to last 3 messages for UI space
+		if len(e.Messages) > 3 {
+			e.Messages = e.Messages[1:]
+		}
+	})
+
+	// Center camera on player
+	e.updateCamera()
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
 	if e.tickCount%6 == 0 {
@@ -146,10 +164,47 @@ func (e *Engine) Resume() {
 	e.State = GameStateRunning
 }
 
+func (e *Engine) updateCamera() {
+	targetMask := components.MaskPlayerControl | components.MaskPosition
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			pos := e.EcsWorld.Positions[i]
+
+			// Goal: player in the middle
+			newX := pos.X - (e.Camera.Width / 2)
+			newY := pos.Y - (e.Camera.Height / 2)
+
+			// Clamp to map boundaries
+			if newX < 0 {
+				newX = 0
+			}
+			if newY < 0 {
+				newY = 0
+			}
+			if newX > e.Map.Width-e.Camera.Width {
+				newX = e.Map.Width - e.Camera.Width
+			}
+			if newY > e.Map.Height-e.Camera.Height {
+				newY = e.Map.Height - e.Camera.Height
+			}
+
+			// Don't let the camera go negative if the map is smaller than the viewport
+			if e.Map.Width < e.Camera.Width {
+				newX = 0
+			}
+			if e.Map.Height < e.Camera.Height {
+				newY = 0
+			}
+
+			e.Camera.X = newX
+			e.Camera.Y = newY
+			break
+		}
+	}
+}
+
 // render updates the game screen by drawing the map, GameState overlays,
 // and other visual elements to the Display buffer.
-//
-// Renders top to bottom as separate layers.
 func (e *Engine) render() {
 	e.Display.BeginFrame()
 	e.Display.Clear(core.Black) // Black background
@@ -162,7 +217,7 @@ func (e *Engine) render() {
 	}
 
 	e.renderMapLayer(activeTheme)
-	systems.RenderEntities(e.EcsWorld, e.Display, e.Map)
+	systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
 	e.renderHUD()
 
 	switch e.State {
@@ -198,230 +253,175 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 		}
 	}
 
-	for y := 0; y < e.Map.Height; y++ {
-		for x := 0; x < e.Map.Width; x++ {
+	// Iterate over viewport bounds ONLY
+	for y := e.Camera.Y; y < e.Camera.Y+e.Camera.Height; y++ {
+		for x := e.Camera.X; x < e.Camera.X+e.Camera.Width; x++ {
 			tile := e.Map.GetTile(x, y)
 			if tile == nil {
 				continue
 			}
+
+			// Translate world X,Y to screen coordinates
+			screenX, screenY := e.Camera.WorldToScreen(x, y)
+
+			// 1. Draw Autopilot Path
 			isPathTile := e.PathLookup[y*e.Map.Width+x]
-			// We only draw the path if it's on a tile we've at least explored!
-			// (Drawing a path through Pitch Black space breaks the Fog of War illusion).
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "*", core.Red)
+				e.Display.DrawText(screenX, screenY, "*", core.Red)
 				continue
 			}
 
+			// 2. Draw Map Base
 			if tile.Type == world.TileTypeEmpty {
 				continue
 			}
 
-			// Render map tiles using glyphs instead of sprites!
 			if tile.Visible {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
-				// Add texture to floors based on their Variant
 				if tile.Type == world.TileTypeFloor {
 					switch tile.Variant {
-					case 1:
-						char = "."
-					case 2:
-						char = ","
-					case 3:
-						char = "`"
-					case 4:
-						char = "'"
-					default:
-						char = " " // Empty space for most floors to reduce noise
+					case 1: char = "."
+					case 2: char = ","
+					case 3: char = "`"
+					case 4: char = "'"
+					default: char = " "
 					}
 				}
 
-				// Apply auto-tiling to walls based on their Bitmask
 				if tile.Type == world.TileTypeWall {
-					// Check if we are using the "blueprint/connected" theme.
-					// We only auto-tile if the base character is an intersection/block type that makes sense to connect
 					if char == "╬" || char == "#" || char == "█" || char == "▓" {
 						switch tile.Bitmask {
-						case 0:
-							char = "O" // Pillar (no neighbors)
-						case 1, 4, 5:
-							char = "║" // Vertical (North, South, or Both)
-						case 2, 8, 10:
-							char = "═" // Horizontal (East, West, or Both)
-						case 3:
-							char = "╚" // North + East
-						case 6:
-							char = "╔" // East + South
-						case 12:
-							char = "╗" // South + West
-						case 9:
-							char = "╝" // West + North
-						case 7:
-							char = "╠" // North + East + South
-						case 14:
-							char = "╦" // East + South + West
-						case 13:
-							char = "╣" // South + West + North
-						case 11:
-							char = "╩" // West + North + East
-						case 15:
-							char = "╬" // All 4 directions
+						case 0: char = "O"
+						case 1, 4, 5: char = "║"
+						case 2, 8, 10: char = "═"
+						case 3: char = "╚"
+						case 6: char = "╔"
+						case 12: char = "╗"
+						case 9: char = "╝"
+						case 7: char = "╠"
+						case 14: char = "╦"
+						case 13: char = "╣"
+						case 11: char = "╩"
+						case 15: char = "╬"
 						}
 					}
 				}
 
-				// Apply depth shading to the foreground color based on distance
 				if !powerOn {
-					if tile.Distance > 3 {
-						color = display.DarkenColor(color, 2)
-					}
-					if tile.Distance > 5 {
-						color = display.DarkenColor(color, 2)
-					}
+					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
+					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
 				}
 
-				e.Display.DrawText(x, y, char, color)
+				e.Display.DrawText(screenX, screenY, char, color)
 				continue
 			}
 
 			if tile.Explored {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
-
-				// Apply the same texture to explored floors
 				if tile.Type == world.TileTypeFloor {
 					switch tile.Variant {
-					case 1:
-						char = "."
-					case 2:
-						char = ","
-					case 3:
-						char = "`"
-					case 4:
-						char = "'"
-					default:
-						char = " "
+					case 1: char = "."
+					case 2: char = ","
+					case 3: char = "`"
+					case 4: char = "'"
+					default: char = " "
 					}
 				}
-
 				if tile.Type == world.TileTypeWall {
 					if char == "╬" || char == "#" || char == "█" || char == "▓" {
 						switch tile.Bitmask {
-						case 0:
-							char = "O" // Pillar (no neighbors)
-						case 1, 4, 5:
-							char = "║" // Vertical (North, South, or Both)
-						case 2, 8, 10:
-							char = "═" // Horizontal (East, West, or Both)
-						case 3:
-							char = "╚" // North + East
-						case 6:
-							char = "╔" // East + South
-						case 12:
-							char = "╗" // South + West
-						case 9:
-							char = "╝" // West + North
-						case 7:
-							char = "╠" // North + East + South
-						case 14:
-							char = "╦" // East + South + West
-						case 13:
-							char = "╣" // South + West + North
-						case 11:
-							char = "╩" // West + North + East
-						case 15:
-							char = "╬" // All 4 directions
+						case 0: char = "O"
+						case 1, 4, 5: char = "║"
+						case 2, 8, 10: char = "═"
+						case 3: char = "╚"
+						case 6: char = "╔"
+						case 12: char = "╗"
+						case 9: char = "╝"
+						case 7: char = "╠"
+						case 14: char = "╦"
+						case 13: char = "╣"
+						case 11: char = "╩"
+						case 15: char = "╬"
 						}
 					}
 				}
-
-				// Render explored tiles in a dimmed version of their theme color, not flat gray
 				dimColor := display.DarkenColor(color, 4)
-				e.Display.DrawText(x, y, char, dimColor)
+				e.Display.DrawText(screenX, screenY, char, dimColor)
 				continue
 			}
-
-			// Unexplored Space
-			// We don't draw anything here so the black background shows through
 		}
 	}
 }
 
 func (e *Engine) renderHUD() {
-	// The Y-coordinate where the map ends and the HUD begins
-	hudY := e.Map.Height
-
-	// strings.Repeat is a highly optimized Go standard library function
-	divider := strings.Repeat("═", e.Map.Width)
+	hudY := e.Camera.Height
+	divider := strings.Repeat("═", e.Camera.Width)
 	e.drawText(0, hudY, divider, core.Gray)
 
 	statusText := "HEALTHY"
 	autopilotEngaged := false
-	var interactPrompt string // Store the prompt text if near an interactable
+	var interactPrompt string
 
-	// Find player state for HUD
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			control := e.EcsWorld.PlayerControls[i]
 			position := e.EcsWorld.Positions[i]
-
 			autopilotEngaged = control.Autopilot
 			statusText = control.Status.Title()
 
-			// Check for adjacent interactables
 			interactMask := components.MaskPosition | components.MaskInteractable
 			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
 				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
 					targetPos := e.EcsWorld.Positions[j]
 					dx := targetPos.X - position.X
 					dy := targetPos.Y - position.Y
-					if (dx*dx + dy*dy) <= 2 { // 1 tile away
+					if (dx*dx + dy*dy) <= 2 {
 						interact := e.EcsWorld.Interactables[j]
 						interactPrompt = interact.Prompt
 						break
 					}
 				}
 			}
-
 			break
 		}
 	}
 
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
-
 	if autopilotEngaged {
 		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
 	} else {
 		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
-	// %06d formats the integer to always be 6 digits (e.g., 000142)
 	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
-	e.drawText(e.Map.Width-len(cycleText)-2, hudY+1, cycleText, core.White)
+	e.drawText(e.Camera.Width-len(cycleText)-2, hudY+1, cycleText, core.White)
 
 	if interactPrompt != "" {
-		// Draw the prompt blinking above the HUD
 		if e.tickCount%30 < 15 {
 			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), core.Green)
 		}
 	}
 
+	for i, msg := range e.Messages {
+		color := core.Green
+		if i == 0 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 3) }
+		if i == 1 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 1) }
+		e.drawText(2, hudY+2+i, "> "+msg, color)
+	}
+
 	controls := " [W/A/S/D] Move    [P] Toggle Autopilot    [ESC] Pause System    [Q] Abort"
-	e.drawText(2, hudY+2, controls, core.Gray)
+	e.drawText(2, hudY+7, controls, core.Gray)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
-	centerX := e.Map.Width / 2
+	centerX := e.Camera.Width / 2
 	halfText := len(text) / 2
 	x := centerX - halfText
-
-	
-
 	e.Display.DrawText(x, y, text, color)
 }
 
 func (e *Engine) drawText(x, y int, text string, color core.Color) {
-	
-
 	e.Display.DrawText(x, y, text, color)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/vikash-paf/derelict-facility/internal/components"
@@ -13,8 +14,13 @@ import (
 )
 
 func main() {
+	mapFile := flag.String("map", "", "path to a JSON map file to load")
+	flag.Parse()
+
 	mapWidth, mapHeight := 120, 40
-	windowWidth, windowHeight := 120, 45
+	viewWidth, viewHeight := 100, 30 // Larger viewport
+	hudHeight := 8                  // More room for messages
+	windowWidth, windowHeight := viewWidth, viewHeight+hudHeight
 
 	cellWidth := int32(10)
 	cellHeight := int32(20)
@@ -40,14 +46,24 @@ func main() {
 		ecsWorld = saveData.World
 	} else {
 		fmt.Println("No savegame found, generating new world...")
-		// 2. Build the world map FIRST
-		// seed := time.Now().UnixNano()
-		seed := 12345
-		generator := world.NewFacilityGenerator(uint64(seed))
 		var playerX, playerY int
-		generatedMap, playerX, playerY = generator.Generate(mapWidth, mapHeight)
-		if generatedMap == nil {
-			panic("Failed to generate map")
+		if *mapFile != "" {
+			fmt.Println("Loading map from JSON:", *mapFile)
+			loader := world.NewJSONMapLoader()
+			var err error
+			generatedMap, playerX, playerY, err = loader.Load(*mapFile)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to load map from %s: %v", *mapFile, err))
+			}
+		} else {
+			// 2. Build the world map FIRST
+			// seed := time.Now().UnixNano()
+			seed := 12345
+			generator := world.NewFacilityGenerator(uint64(seed))
+			generatedMap, playerX, playerY = generator.Generate(mapWidth, mapHeight)
+			if generatedMap == nil {
+				panic("Failed to generate map")
+			}
 		}
 
 		// 3. Setup the ECS and spawn the Player
@@ -61,29 +77,41 @@ func main() {
 			Status:    components.PlayerStatusHealthy,
 		})
 
-		// 5. Spawn a test Power Generator
-		genEnt := ecsWorld.CreateEntity()
-		ecsWorld.AddPosition(genEnt, components.Position{X: playerX + 2, Y: playerY})
-		ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
-		ecsWorld.AddSolid(genEnt)
-		ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
-		ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{IsActive: false})
+		// 5. Spawn Power Generators from Map
+		for _, genPos := range generatedMap.PowerGenerators {
+			genEnt := ecsWorld.CreateEntity()
+			ecsWorld.AddPosition(genEnt, components.Position{X: genPos.X, Y: genPos.Y})
+			ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
+			ecsWorld.AddSolid(genEnt)
+			ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+			ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{IsActive: false})
+		}
 
-		// Spawn a Save Terminal
-		termEnt := ecsWorld.CreateEntity()
-		ecsWorld.AddPosition(termEnt, components.Position{X: playerX, Y: playerY + 2})
-		ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "🖥️", Color: core.Cyan})
-		ecsWorld.AddSolid(termEnt)
-		ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Save Checkpoint"})
-		ecsWorld.AddTerminal(termEnt, components.Terminal{HasSaved: false})
+		// Spawn Terminals from Map
+		for _, termPos := range generatedMap.Terminals {
+			termEnt := ecsWorld.CreateEntity()
+			ecsWorld.AddPosition(termEnt, components.Position{X: termPos.X, Y: termPos.Y})
+			ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "T", Color: core.Cyan})
+			ecsWorld.AddSolid(termEnt)
+			ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Access Terminal"})
+
+			terminalComp := components.Terminal{HasSaved: false}
+			narrativeComp := components.Narrative{Text: "LOG 001: Sector 4 containment breach. All non-essential personnel evacuate immediately. The life support backup is failing."}
+
+			// Special case: The terminal in Lab 6 grants security clearance
+			if termPos.X == 36 && termPos.Y == 12 {
+				terminalComp.GrantClearance = 1
+				narrativeComp.Text = "SECURITY OVERRIDE INITIALIZED: Sector 4 Security Gate has been UNLOCKED. [Auth: Admin_7]"
+			}
+
+			ecsWorld.AddTerminal(termEnt, terminalComp)
+			ecsWorld.AddNarrative(termEnt, narrativeComp)
+		}
 
 		// 6. Spawn Doors
 		for _, doorPos := range generatedMap.Doors {
-			// Don't spawn a door right on top of the player or generator
+			// Don't spawn a door right on top of the player
 			if doorPos.X == playerX && doorPos.Y == playerY {
-				continue
-			}
-			if doorPos.X == playerX+2 && doorPos.Y == playerY {
 				continue
 			}
 
@@ -92,12 +120,27 @@ func main() {
 			ecsWorld.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.White})
 			ecsWorld.AddSolid(doorEnt) // Closed doors block movement!
 			ecsWorld.AddInteractable(doorEnt, components.Interactable{Prompt: "Press [E] to Open Door"})
-			ecsWorld.AddDoor(doorEnt, components.Door{IsOpen: false})
+
+			doorComp := components.Door{IsOpen: false}
+			// Special case: The first door in the hub is locked
+			if doorPos.X == 10 && doorPos.Y == 8 {
+				doorComp.RequiredClearance = 1
+				ecsWorld.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.Red}) // Visual indicator it's locked
+			}
+
+			ecsWorld.AddDoor(doorEnt, doorComp)
 		}
 	}
 
 	// 7. Hand everything to the Engine
-	gameEngine := engine.NewEngine(disp, generatedMap, ecsWorld, world.TileVariantGritty)
+	gameEngine := engine.NewEngine(
+		disp,
+		generatedMap,
+		ecsWorld,
+		world.TileVariantGritty,
+		viewWidth,
+		viewHeight,
+	)
 
 	err = gameEngine.Run()
 	if err != nil {
