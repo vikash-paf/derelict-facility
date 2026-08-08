@@ -146,8 +146,6 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
 	}
 
-	powerOn := systems.IsPowerActive(e.EcsWorld)
-
 	// Calculate FOV
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
@@ -161,7 +159,9 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 				}
 				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
-			}, powerOn)
+			}, func(x, y int) bool {
+				return systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+			})
 			break // Compute FOV for the first player found
 		}
 	}

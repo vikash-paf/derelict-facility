@@ -58,19 +58,18 @@ func (m *Map) GetTile(x, y int) *Tile {
 	return &m.Tiles[x+y*m.Width]
 }
 
-func (m *Map) ComputeFOV(playerX, playerY int, radius int, blocksLight func(x, y int) bool, powerOn bool) {
-	for i := range m.Tiles {
-		if powerOn {
-			m.Tiles[i].Visible = true
-			m.Tiles[i].Explored = true
-			m.Tiles[i].Distance = 0
-		} else {
-			m.Tiles[i].Visible = false
+func (m *Map) ComputeFOV(playerX, playerY int, radius int, blocksLight func(x, y int) bool, isTilePowered func(x, y int) bool) {
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			idx := m.GetIndex(x, y)
+			if isTilePowered != nil && isTilePowered(x, y) {
+				m.Tiles[idx].Visible = true
+				m.Tiles[idx].Explored = true
+				m.Tiles[idx].Distance = 0
+			} else {
+				m.Tiles[idx].Visible = false
+			}
 		}
-	}
-
-	if powerOn {
-		return // The whole map is lit, no need to cast rays!
 	}
 
 	// clamp the bounding box so we stay inside the map
