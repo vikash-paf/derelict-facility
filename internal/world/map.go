@@ -4,12 +4,17 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/entity"
 )
 
+type GeneratorInfo struct {
+	Pos      entity.Point
+	IsGlobal bool
+}
+
 type Map struct {
 	Tiles           []Tile
 	Rooms           []Rect
 	Doors           []entity.Point
 	Terminals       []entity.Point
-	PowerGenerators []entity.Point
+	PowerGenerators []GeneratorInfo
 	Width           int
 	Height          int
 }

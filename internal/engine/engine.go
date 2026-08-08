@@ -249,8 +249,6 @@ func (e *Engine) renderPauseMenu() {
 func (e *Engine) renderMapLayer(theme world.TileVariant) {
 	clear(e.PathLookup)
 
-	powerOn := systems.IsPowerActive(e.EcsWorld)
-
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
 	targetMask := components.MaskPlayerControl
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
@@ -320,7 +318,8 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					color = core.LerpColor(color, sunColor, 0.45)
 				}
 
-				if !powerOn && !tile.IsSunlit {
+				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+				if !isTilePowered && !tile.IsSunlit {
 					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
 					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
 				}

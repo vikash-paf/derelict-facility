@@ -83,13 +83,16 @@ func main() {
 		})
 
 		// 5. Spawn Power Generators from Map
-		for _, genPos := range generatedMap.PowerGenerators {
+		for _, genInfo := range generatedMap.PowerGenerators {
 			genEnt := ecsWorld.CreateEntity()
-			ecsWorld.AddPosition(genEnt, components.Position{X: genPos.X, Y: genPos.Y})
+			ecsWorld.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
 			ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
 			ecsWorld.AddSolid(genEnt)
 			ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
-			ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{IsActive: false})
+			ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{
+				IsActive: false,
+				IsGlobal: genInfo.IsGlobal,
+			})
 		}
 
 		// Spawn Terminals from Map
