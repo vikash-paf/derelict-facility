@@ -28,9 +28,9 @@ func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *R
 }
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
-	rl.ClearWindowState(rl.FlagWindowTransparent) // Fix transparency issue on some Linux window managers
-	rl.SetWindowState(rl.FlagWindowResizable)
+	rl.SetConfigFlags(rl.FlagWindowResizable)
 	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
+	rl.ClearWindowState(rl.FlagWindowTransparent) // Fix transparency issue on some Linux window managers
 	rl.SetTargetFPS(60)
 	rl.SetExitKey(0)
 
