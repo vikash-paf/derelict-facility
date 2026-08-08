@@ -15,4 +15,6 @@ type Display interface {
 	DrawText(gridX, gridY int, text string, color core.Color)
 	DrawSprite(gridX, gridY int, sheetX, sheetY int, color core.Color)
 	PollInput() []core.InputEvent
+	GetDimensions() (int, int)
+	IsResized() bool
 }

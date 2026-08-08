@@ -76,6 +76,15 @@ func NewEngine(
 // Run starts the deterministic game loop
 func (e *Engine) Run() error {
 	for !e.Display.ShouldClose() && e.Running {
+		if e.Display.IsResized() {
+			gw, gh := e.Display.GetDimensions()
+			hudHeight := 8
+			if gh > hudHeight {
+				e.Camera.Width = gw
+				e.Camera.Height = gh - hudHeight
+			}
+		}
+
 		events := e.Display.PollInput()
 		e.handleInputForGlobals(events)
 
@@ -390,13 +399,17 @@ func (e *Engine) renderHUD() {
 
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
 	if autopilotEngaged {
-		e.drawText(25, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
+		e.drawText(22, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
 	} else {
-		e.drawText(25, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
+		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
 	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
-	e.drawText(e.Camera.Width-len(cycleText)-2, hudY+1, cycleText, core.White)
+	cycleX := e.Camera.Width - len(cycleText) - 5
+	if cycleX < 55 {
+		cycleX = 55
+	}
+	e.drawText(cycleX, hudY+1, cycleText, core.White)
 
 	if interactPrompt != "" {
 		if e.tickCount%30 < 15 {

@@ -29,6 +29,7 @@ func NewRaylibDisplay(cellWidth, cellHeight, fontSize int32, fontPath string) *R
 
 func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 	rl.ClearWindowState(rl.FlagWindowTransparent) // Fix transparency issue on some Linux window managers
+	rl.SetWindowState(rl.FlagWindowResizable)
 	rl.InitWindow(int32(gridWidth)*r.CellWidth, int32(gridHeight)*r.CellHeight, title)
 	rl.SetTargetFPS(60)
 	rl.SetExitKey(0)
@@ -190,4 +191,20 @@ func DarkenColor(color core.Color, factor uint8) core.Color {
 		B: color.B / factor,
 		A: color.A,
 	}
+}
+
+func (r *RaylibDisplay) GetDimensions() (int, int) {
+	w := int(rl.GetScreenWidth()) / int(r.CellWidth)
+	h := int(rl.GetScreenHeight()) / int(r.CellHeight)
+	if w < 1 {
+		w = 1
+	}
+	if h < 1 {
+		h = 1
+	}
+	return w, h
+}
+
+func (r *RaylibDisplay) IsResized() bool {
+	return rl.IsWindowResized()
 }
