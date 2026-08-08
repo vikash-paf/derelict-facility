@@ -311,8 +311,25 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile.Visible {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
+				// Draw floor tile background fill using ambient daylight color
 				if tile.Type == world.TileTypeFloor {
-					char = " "
+					bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
+					sunColor := e.Clock.GetSunlightColor()
+					if tile.IsSunlit {
+						bgColor = core.LerpColor(bgColor, sunColor, 0.40)
+					} else if e.Clock.IsDaytime() {
+						bgColor = core.LerpColor(bgColor, sunColor, 0.15)
+					}
+
+					isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+					isSunlitByDay := tile.IsSunlit && e.Clock.IsDaytime()
+					if !isTilePowered && !isSunlitByDay {
+						if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
+						if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
+					}
+
+					e.Display.DrawRect(screenX, screenY, bgColor)
+					continue
 				}
 
 				if tile.Type == world.TileTypeWall {
@@ -332,14 +349,13 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 						case 15: char = "╬"
 						}
 					}
-				}
 
-				// Apply subtle daylight color tinting based on time of day
-				sunColor := e.Clock.GetSunlightColor()
-				if tile.IsSunlit {
-					color = core.LerpColor(color, sunColor, 0.45)
-				} else if e.Clock.IsDaytime() {
-					color = core.LerpColor(color, sunColor, 0.20)
+					sunColor := e.Clock.GetSunlightColor()
+					if tile.IsSunlit {
+						color = core.LerpColor(color, sunColor, 0.45)
+					} else if e.Clock.IsDaytime() {
+						color = core.LerpColor(color, sunColor, 0.20)
+					}
 				}
 
 				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
@@ -354,10 +370,11 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 
 			if tile.Explored {
-				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 				if tile.Type == world.TileTypeFloor {
-					char = " "
+					e.Display.DrawRect(screenX, screenY, core.Color{R: 8, G: 8, B: 12, A: 255})
+					continue
 				}
+				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 				if tile.Type == world.TileTypeWall {
 					if char == "╬" || char == "#" || char == "█" || char == "▓" {
 						switch tile.Bitmask {
