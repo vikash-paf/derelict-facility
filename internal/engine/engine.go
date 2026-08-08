@@ -37,6 +37,7 @@ type Engine struct {
 	BaseTheme  world.TileVariant
 	TickerRate time.Duration
 	tickCount  int
+	Clock      *world.FacilityClock
 	State      GameState
 	Running    bool
 	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
@@ -60,6 +61,7 @@ func NewEngine(
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
+		Clock:      world.NewFacilityClock(),
 		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
 		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 		Camera: &core.Camera{
@@ -116,8 +118,8 @@ func (e *Engine) Update(events []core.InputEvent) {
 	switch e.State {
 	case GameStatePaused:
 		// do nothing, the world is frozen
-		// later: implement it to save the game
 	case GameStateRunning:
+		e.Clock.Tick()
 		e.processSimulation(events)
 	}
 }
@@ -313,7 +315,12 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 				}
 
-				if !powerOn {
+				if tile.IsSunlit {
+					sunColor := e.Clock.GetSunlightColor()
+					color = core.LerpColor(color, sunColor, 0.45)
+				}
+
+				if !powerOn && !tile.IsSunlit {
 					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
 					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
 				}
@@ -394,12 +401,12 @@ func (e *Engine) renderHUD() {
 		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
-	cycleText := fmt.Sprintf(" CYCLE: %06d ", e.tickCount)
-	cycleX := e.Camera.Width - len(cycleText) - 5
-	if cycleX < 55 {
-		cycleX = 55
+	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
+	clockX := e.Camera.Width - len(clockText) - 2
+	if clockX < 55 {
+		clockX = 55
 	}
-	e.drawText(cycleX, hudY+1, cycleText, core.White)
+	e.drawText(clockX, hudY+1, clockText, core.Yellow)
 
 	if interactPrompt != "" {
 		if e.tickCount%30 < 15 {

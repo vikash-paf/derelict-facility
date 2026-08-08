@@ -53,6 +53,8 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 				m.SetTile(x, y, Tile{Type: TileTypeWall, Walkable: false})
 			case '.': // Floor
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+			case 'S', '*': // Skylight Glass Roof Floor
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, IsSunlit: true, Variant: 1})
 			case '+': // Door
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				doors = append(doors, entity.Point{X: x, Y: y})

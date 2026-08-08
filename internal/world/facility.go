@@ -95,6 +95,15 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 		// get player coordinates
 		if len(rooms) == 0 {
 			playerX, playerY = newRoom.Center()
+			// Mark the central spawn atrium as a Sunlit Skylight Glass Hall
+			for rx := newRoom.X1; rx <= newRoom.X2; rx++ {
+				for ry := newRoom.Y1; ry <= newRoom.Y2; ry++ {
+					t := m.GetTile(rx, ry)
+					if t != nil {
+						t.IsSunlit = true
+					}
+				}
+			}
 		} else {
 			prevRoom := rooms[len(rooms)-1]
 			prevX, prevY := prevRoom.Center()
