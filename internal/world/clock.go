@@ -45,12 +45,12 @@ var SeasonConfigs = map[Season]SeasonConfig{
 	SeasonWinter: {SunriseHour: 8, SunsetHour: 16}, // Long Nights / Short Days (8h daylight)
 }
 
-// DaylightColors define the color palette transitions across time of day.
+// DaylightColors define subtle color tint transitions across time of day.
 var (
-	NightColor  = core.Color{R: 30, G: 50, B: 180, A: 255}   // Deep midnight cobalt blue
-	DawnColor   = core.Color{R: 255, G: 160, B: 60, A: 255}  // Bright golden dawn amber
-	MiddayColor = core.Color{R: 255, G: 255, B: 180, A: 255} // Warm bright sunlight yellow
-	DuskColor   = core.Color{R: 240, G: 80, B: 160, A: 255}  // Vibrant pinkish-violet dusk
+	NightColor  = core.Color{R: 50, G: 70, B: 120, A: 255}   // Faint cool night blue
+	DawnColor   = core.Color{R: 240, G: 190, B: 150, A: 255} // Soft subtle amber dawn
+	MiddayColor = core.Color{R: 245, G: 240, B: 210, A: 255} // Light subtle warm daylight
+	DuskColor   = core.Color{R: 220, G: 160, B: 180, A: 255} // Soft muted rose twilight
 )
 
 // FacilityClock tracks in-game time, day cycle, and seasonal daylight curves.

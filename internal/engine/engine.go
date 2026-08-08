@@ -312,9 +312,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
 				if tile.Type == world.TileTypeFloor {
-					char = "."
-					// Subdue floor tile contrast so walls and entities pop out cleanly
-					color = display.DarkenColor(color, 2)
+					char = " "
 				}
 
 				if tile.Type == world.TileTypeWall {
@@ -336,9 +334,12 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 				}
 
+				// Apply subtle daylight color tinting based on time of day
+				sunColor := e.Clock.GetSunlightColor()
 				if tile.IsSunlit {
-					sunColor := e.Clock.GetSunlightColor()
-					color = core.LerpColor(color, sunColor, 0.75)
+					color = core.LerpColor(color, sunColor, 0.45)
+				} else if e.Clock.IsDaytime() {
+					color = core.LerpColor(color, sunColor, 0.20)
 				}
 
 				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
@@ -355,7 +356,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile.Explored {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 				if tile.Type == world.TileTypeFloor {
-					char = "."
+					char = " "
 				}
 				if tile.Type == world.TileTypeWall {
 					if char == "╬" || char == "#" || char == "█" || char == "▓" {
