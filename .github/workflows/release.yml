@@ -26,21 +26,17 @@ jobs:
         run: |
           CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
           go build -v -ldflags="-s -w" -o bin/derelict_linux ./cmd/derelict
-          cp -r assets bin/
-          cd bin && zip -r derelict_linux.zip derelict_linux assets && rm -rf derelict_linux assets
 
       - name: Build Windows
         run: |
           CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ \
           go build -v -ldflags="-s -w" -o bin/derelict_win.exe ./cmd/derelict
-          cp -r assets bin/
-          cd bin && zip -r derelict_win.zip derelict_win.exe assets && rm derelict_win.exe && rm -rf assets
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: derelict-binaries-linux-win
-          path: bin/*.zip
+          path: bin/*
 
   build-macos:
     runs-on: macos-latest
@@ -57,21 +53,17 @@ jobs:
         run: |
           CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CC=clang CXX=clang++ \
           go build -v -ldflags="-s -w" -o bin/derelict_mac_intel ./cmd/derelict
-          cp -r assets bin/
-          cd bin && zip -r derelict_mac_intel.zip derelict_mac_intel assets && rm derelict_mac_intel && rm -rf assets
 
       - name: Build macOS ARM
         run: |
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CC=clang CXX=clang++ \
           go build -v -ldflags="-s -w" -o bin/derelict_mac_apple ./cmd/derelict
-          cp -r assets bin/
-          cd bin && zip -r derelict_mac_apple.zip derelict_mac_apple assets && rm derelict_mac_apple && rm -rf assets
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: derelict-binaries-mac
-          path: bin/*.zip
+          path: bin/*
 
   release:
     needs: [build-linux-windows, build-macos]
