@@ -11,6 +11,7 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
+	"github.com/vikash-paf/derelict-facility/internal/menu"
 	"github.com/vikash-paf/derelict-facility/internal/systems"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -22,13 +23,20 @@ const (
 type GameState uint8
 
 const (
-	GameStatePaused GameState = iota
+	GameStateMainMenu GameState = iota
 	GameStateRunning
+	GameStatePaused
 )
 
-// Flip the game state without branching, so it's a bit faster than using a switch statement.
+// Flip toggles between Paused and Running states
 func (s GameState) Flip() GameState {
-	return s ^ 1
+	if s == GameStatePaused {
+		return GameStateRunning
+	}
+	if s == GameStateRunning {
+		return GameStatePaused
+	}
+	return s
 }
 
 type Engine struct {
@@ -41,6 +49,7 @@ type Engine struct {
 	tickCount  int
 	Clock      *world.FacilityClock
 	State      GameState
+	Menu       *menu.MenuState
 	Running    bool
 	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
 	Pathfinder *world.Pathfinder
@@ -63,19 +72,23 @@ func NewEngine(
 		Audio:      audioMgr,
 		Map:        gameMap,
 		EcsWorld:   ecsWorld,
-		State:      GameStateRunning,
+		State:      GameStateMainMenu,
+		Menu:       menu.NewMenuState(),
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
 		Clock:      world.NewFacilityClock(),
-		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
-		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 		Camera: &core.Camera{
 			X:      0,
 			Y:      0,
 			Width:  viewWidth,
 			Height: viewHeight,
 		},
+	}
+
+	if gameMap != nil {
+		e.PathLookup = make([]bool, gameMap.Width*gameMap.Height)
+		e.Pathfinder = world.NewPathfinder(gameMap.Width, gameMap.Height)
 	}
 
 	return e
@@ -93,7 +106,9 @@ func (e *Engine) Run() error {
 		events := e.Display.PollInput()
 		e.handleInputForGlobals(events)
 
-		if e.State == GameStateRunning {
+		if e.State == GameStateMainMenu {
+			e.handleMainMenuInput(events)
+		} else if e.State == GameStateRunning {
 			e.Update(events) // Calculate all game rules!
 		}
 
@@ -103,13 +118,124 @@ func (e *Engine) Run() error {
 	return nil
 }
 
+func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
+	for _, event := range events {
+		switch event.Key {
+		case rl.KeyUp:
+			e.Menu.SelectPrevious()
+			e.Audio.Play(audio.SoundFootstep)
+		case rl.KeyDown:
+			e.Menu.SelectNext()
+			e.Audio.Play(audio.SoundFootstep)
+		case rl.KeyEnter:
+			e.Audio.Play(audio.SoundTerminalAccess)
+			e.launchSelectedMission()
+		}
+	}
+}
+
+func (e *Engine) launchSelectedMission() {
+	mission := e.Menu.GetSelectedMission()
+
+	var loadedMap *world.Map
+	var playerX, playerY int
+
+	if mission.MapFile != "" {
+		loader := world.NewJSONMapLoader()
+		var err error
+		loadedMap, playerX, playerY, err = loader.Load(mission.MapFile)
+		if err != nil {
+			loadedMap = nil
+		}
+	}
+
+	if loadedMap == nil {
+		seed := time.Now().UnixNano()
+		generator := world.NewFacilityGenerator(uint64(seed))
+		loadedMap, playerX, playerY = generator.Generate(120, 40)
+	}
+
+	e.Map = loadedMap
+	e.PathLookup = make([]bool, loadedMap.Width*loadedMap.Height)
+	e.Pathfinder = world.NewPathfinder(loadedMap.Width, loadedMap.Height)
+
+	// Build fresh ECS world for mission
+	e.EcsWorld = buildMissionWorld(loadedMap, playerX, playerY)
+	e.State = GameStateRunning
+}
+
+func buildMissionWorld(gameMap *world.Map, playerX, playerY int) *ecs.World {
+	ecsWorld := ecs.NewWorld()
+
+	playerEnt := ecsWorld.CreateEntity()
+	ecsWorld.AddPosition(playerEnt, components.Position{X: playerX, Y: playerY})
+	ecsWorld.AddGlyph(playerEnt, components.Glyph{Char: "@", Color: core.BrightWhite})
+	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
+		Autopilot: false,
+		Status:    components.PlayerStatusHealthy,
+	})
+
+	for _, genInfo := range gameMap.PowerGenerators {
+		genEnt := ecsWorld.CreateEntity()
+		ecsWorld.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
+		ecsWorld.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
+		ecsWorld.AddSolid(genEnt)
+		ecsWorld.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+		ecsWorld.AddPowerGenerator(genEnt, components.PowerGenerator{
+			IsActive: false,
+			IsGlobal: genInfo.IsGlobal,
+		})
+	}
+
+	for _, termPos := range gameMap.Terminals {
+		termEnt := ecsWorld.CreateEntity()
+		ecsWorld.AddPosition(termEnt, components.Position{X: termPos.X, Y: termPos.Y})
+		ecsWorld.AddGlyph(termEnt, components.Glyph{Char: "T", Color: core.Cyan})
+		ecsWorld.AddSolid(termEnt)
+		ecsWorld.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Access Terminal"})
+
+		terminalComp := components.Terminal{HasSaved: false}
+		narrativeComp := components.Narrative{Text: "LOG 001: Sector 4 containment breach. All non-essential personnel evacuate immediately."}
+
+		if termPos.X == 36 && termPos.Y == 12 {
+			terminalComp.GrantClearance = 1
+			narrativeComp.Text = "SECURITY OVERRIDE INITIALIZED: Sector 4 Security Gate has been UNLOCKED."
+		}
+
+		ecsWorld.AddTerminal(termEnt, terminalComp)
+		ecsWorld.AddNarrative(termEnt, narrativeComp)
+	}
+
+	for _, doorPos := range gameMap.Doors {
+		if doorPos.X == playerX && doorPos.Y == playerY {
+			continue
+		}
+
+		doorEnt := ecsWorld.CreateEntity()
+		ecsWorld.AddPosition(doorEnt, components.Position{X: doorPos.X, Y: doorPos.Y})
+		ecsWorld.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.White})
+		ecsWorld.AddSolid(doorEnt)
+		ecsWorld.AddInteractable(doorEnt, components.Interactable{Prompt: "Press [E] to Open Door"})
+
+		doorComp := components.Door{IsOpen: false}
+		if doorPos.X == 10 && doorPos.Y == 8 {
+			doorComp.RequiredClearance = 1
+			ecsWorld.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.Red})
+		}
+
+		ecsWorld.AddDoor(doorEnt, doorComp)
+	}
+
+	return ecsWorld
+}
+
 func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 	for _, event := range events {
 		if event.Quit || event.Key == rl.KeyQ {
 			e.Running = false
 			return
 		}
-		if event.Key == rl.KeyEscape {
+		if event.Key == rl.KeyEscape && e.State != GameStateMainMenu {
 			e.State = e.State.Flip()
 		}
 		if event.Key == rl.KeyEqual { // '+' key to Zoom In
@@ -180,29 +306,24 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		return systems.IsSolidAt(e.EcsWorld, x, y)
 	})
 
-	// Calculate FOV
-	targetMask := components.MaskPlayerControl | components.MaskPosition
+	// Recalculate FOV based on current player position
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		targetMask := components.MaskPlayerControl | components.MaskPosition
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
-
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
-				// 1. Is the map tile a wall?
 				if !e.Map.IsWalkable(x, y) {
 					return true
 				}
-				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
 			}, func(x, y int) bool {
-				// Lit by power grid generator OR lit by natural daytime skylight (including spillover)
-				isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-				if isPowered {
+				if systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y) {
 					return true
 				}
 				tile := e.Map.GetTile(x, y)
 				return tile != nil && tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 			})
-			break // Compute FOV for the first player found
+			break
 		}
 	}
 }
@@ -220,30 +341,13 @@ func (e *Engine) updateCamera() {
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
+			newX := pos.X - e.Camera.Width/2
+			newY := pos.Y - e.Camera.Height/2
 
-			// Goal: player in the middle
-			newX := pos.X - (e.Camera.Width / 2)
-			newY := pos.Y - (e.Camera.Height / 2)
-
-			// Clamp to map boundaries
 			if newX < 0 {
 				newX = 0
 			}
 			if newY < 0 {
-				newY = 0
-			}
-			if newX > e.Map.Width-e.Camera.Width {
-				newX = e.Map.Width - e.Camera.Width
-			}
-			if newY > e.Map.Height-e.Camera.Height {
-				newY = e.Map.Height - e.Camera.Height
-			}
-
-			// Don't let the camera go negative if the map is smaller than the viewport
-			if e.Map.Width < e.Camera.Width {
-				newX = 0
-			}
-			if e.Map.Height < e.Camera.Height {
 				newY = 0
 			}
 
@@ -258,6 +362,13 @@ func (e *Engine) updateCamera() {
 // and other visual elements to the Display buffer.
 func (e *Engine) render() {
 	e.Display.BeginFrame()
+
+	if e.State == GameStateMainMenu {
+		e.Menu.Render(e.Display, e.Camera.Width, e.Camera.Height+8)
+		e.Display.EndFrame()
+		return
+	}
+
 	e.Display.Clear(core.Black) // Black background
 
 	// Determine active theme based on global states
@@ -267,9 +378,11 @@ func (e *Engine) render() {
 		activeTheme = world.TileVariantPaused
 	}
 
-	e.renderMapLayer(activeTheme)
-	systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
-	e.renderHUD()
+	if e.Map != nil && e.EcsWorld != nil {
+		e.renderMapLayer(activeTheme)
+		systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
+		e.renderHUD()
+	}
 
 	switch e.State {
 	case GameStatePaused:
