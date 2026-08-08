@@ -1,7 +1,10 @@
 package display
 
 import (
+	"path"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/vikash-paf/derelict-facility/assets"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 )
 
@@ -38,17 +41,38 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		extraChars := []rune{'═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬', '█', '▓', '▒', '░', '·', '►', '◄', '▲', '▼', '⚡', '👷', '🖥'}
 		fontChars = append(fontChars, extraChars...)
 
-		r.Font = rl.LoadFontEx(r.FontPath, r.FontSize, fontChars)
-		rl.SetTextureFilter(r.Font.Texture, rl.FilterPoint) // Pixel perfect text
+		// Read font from embedded assets filesystem
+		fontBytes, err := assets.AssetsFS.ReadFile(r.FontPath)
+		if err == nil && len(fontBytes) > 0 {
+			fileType := path.Ext(r.FontPath)
+			r.Font = rl.LoadFontFromMemory(fileType, fontBytes, r.FontSize, fontChars)
+		}
 
-		fallbackPath := "assets/fonts/NotoEmoji-Regular.ttf"
-		r.FallbackFont = rl.LoadFontEx(fallbackPath, r.FontSize, fontChars)
+		if r.Font.Texture.ID == 0 || r.Font.BaseSize == 0 {
+			// Fall back to default raylib font if loading fails
+			r.Font = rl.GetFontDefault()
+			r.FontPath = ""
+		} else {
+			rl.SetTextureFilter(r.Font.Texture, rl.FilterPoint) // Pixel perfect text
+
+			fallbackPath := "fonts/NotoEmoji-Regular.ttf"
+			fallbackBytes, err := assets.AssetsFS.ReadFile(fallbackPath)
+			if err == nil && len(fallbackBytes) > 0 {
+				r.FallbackFont = rl.LoadFontFromMemory(".ttf", fallbackBytes, r.FontSize, fontChars)
+			}
+		}
 	} else {
 		r.Font = rl.GetFontDefault()
 	}
 
-	r.Tileset = rl.LoadTexture("assets/tileset.png")
-	rl.SetTextureFilter(r.Tileset, rl.FilterPoint) // CRITICAL: Fixes gaps and blurring in pixel art
+	// Read tileset texture from embedded assets if available
+	tilesetBytes, err := assets.AssetsFS.ReadFile("tileset.png")
+	if err == nil && len(tilesetBytes) > 0 {
+		img := rl.LoadImageFromMemory(".png", tilesetBytes, int32(len(tilesetBytes)))
+		r.Tileset = rl.LoadTextureFromImage(img)
+		rl.UnloadImage(img)
+		rl.SetTextureFilter(r.Tileset, rl.FilterPoint)
+	}
 
 	return nil
 }
