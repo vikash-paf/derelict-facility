@@ -65,16 +65,14 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 		r.Font = rl.GetFontDefault()
 	}
 
-	// Read tileset texture from embedded assets
+	// Read tileset texture from embedded assets if available
 	tilesetBytes, err := assets.AssetsFS.ReadFile("tileset.png")
 	if err == nil && len(tilesetBytes) > 0 {
 		img := rl.LoadImageFromMemory(".png", tilesetBytes, int32(len(tilesetBytes)))
 		r.Tileset = rl.LoadTextureFromImage(img)
 		rl.UnloadImage(img)
-	} else {
-		r.Tileset = rl.LoadTexture("assets/tileset.png")
+		rl.SetTextureFilter(r.Tileset, rl.FilterPoint)
 	}
-	rl.SetTextureFilter(r.Tileset, rl.FilterPoint) // CRITICAL: Fixes gaps and blurring in pixel art
 
 	return nil
 }
