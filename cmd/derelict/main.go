@@ -47,13 +47,18 @@ func main() {
 	} else {
 		fmt.Println("No savegame found, generating new world...")
 		var playerX, playerY int
-		if *mapFile != "" {
-			fmt.Println("Loading map from JSON:", *mapFile)
+		targetMapFile := *mapFile
+		if targetMapFile == "" {
+			targetMapFile = "test_map.json"
+		}
+
+		if targetMapFile != "" {
+			fmt.Println("Loading map from JSON:", targetMapFile)
 			loader := world.NewJSONMapLoader()
 			var err error
-			generatedMap, playerX, playerY, err = loader.Load(*mapFile)
+			generatedMap, playerX, playerY, err = loader.Load(targetMapFile)
 			if err != nil {
-				panic(fmt.Sprintf("Failed to load map from %s: %v", *mapFile, err))
+				panic(fmt.Sprintf("Failed to load map from %s: %v", targetMapFile, err))
 			}
 		} else {
 			// 2. Build the world map FIRST
