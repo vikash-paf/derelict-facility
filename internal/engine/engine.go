@@ -154,6 +154,7 @@ func (e *Engine) launchSelectedMission() {
 	generator := world.NewFacilityGenerator(uint64(seed))
 	loadedMap, playerX, playerY := generator.Generate(120, 40)
 	e.activateMap(loadedMap, playerX, playerY, nil, "")
+	e.State = GameStateRunning
 }
 
 // loadLevelByID loads a specific level from the active mission manifest, preserving

@@ -26,6 +26,7 @@ func NewMenuState() *MenuState {
 
 	var items []MissionItem
 	for _, m := range discovered {
+		m := m // shadow loop var to capture a unique copy per iteration
 		items = append(items, MissionItem{
 			ID:          m.ID,
 			Title:       m.Title,
