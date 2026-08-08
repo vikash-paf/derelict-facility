@@ -21,12 +21,17 @@ func NewJSONMapLoader() *JSONMapLoader {
 	return &JSONMapLoader{}
 }
 
-// Load reads the JSON file and returns the Map, PlayerX, and PlayerY.
+// Load reads the JSON file from OS disk and returns the Map, PlayerX, and PlayerY.
 func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, 0, 0, err
 	}
+	return l.LoadBytes(data)
+}
+
+// LoadBytes parses raw JSON map bytes and returns the Map, PlayerX, and PlayerY.
+func (l *JSONMapLoader) LoadBytes(data []byte) (*Map, int, int, error) {
 
 	var mapData JSONMapData
 	if err := json.Unmarshal(data, &mapData); err != nil {
@@ -70,6 +75,18 @@ func (l *JSONMapLoader) Load(filepath string) (*Map, int, int, error) {
 			case '@': // Player start position
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				playerX, playerY = x, y
+			case '>': // Down Stairway / Elevator to next level
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				m.Stairways = append(m.Stairways, StairwayInfo{
+					Pos:  entity.Point{X: x, Y: y},
+					IsUp: false,
+				})
+			case '<': // Up Stairway / Elevator to previous level
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				m.Stairways = append(m.Stairways, StairwayInfo{
+					Pos:  entity.Point{X: x, Y: y},
+					IsUp: true,
+				})
 			default:
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 			}

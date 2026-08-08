@@ -20,6 +20,7 @@ const (
 
 type AudioManager struct {
 	initialized bool
+	muted       bool
 	sounds      map[SoundID]rl.Sound
 }
 
@@ -62,12 +63,23 @@ func (a *AudioManager) Init() {
 }
 
 func (a *AudioManager) Play(id SoundID) {
-	if !a.initialized {
+	if !a.initialized || a.muted {
 		return
 	}
 	if sound, exists := a.sounds[id]; exists {
 		rl.PlaySound(sound)
 	}
+}
+
+// ToggleMute flips the mute state and returns the new state.
+func (a *AudioManager) ToggleMute() bool {
+	a.muted = !a.muted
+	return a.muted
+}
+
+// IsMuted returns true when sound is muted.
+func (a *AudioManager) IsMuted() bool {
+	return a.muted
 }
 
 func (a *AudioManager) Close() {

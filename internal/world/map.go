@@ -9,12 +9,20 @@ type GeneratorInfo struct {
 	IsGlobal bool
 }
 
+type StairwayInfo struct {
+	Pos               entity.Point
+	TargetLevelID     string
+	RequiredClearance uint32
+	IsUp              bool
+}
+
 type Map struct {
 	Tiles           []Tile
 	Rooms           []Rect
 	Doors           []entity.Point
 	Terminals       []entity.Point
 	PowerGenerators []GeneratorInfo
+	Stairways       []StairwayInfo
 	Width           int
 	Height          int
 }

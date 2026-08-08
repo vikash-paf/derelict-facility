@@ -11,6 +11,8 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/display"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
+	"github.com/vikash-paf/derelict-facility/internal/menu"
+	"github.com/vikash-paf/derelict-facility/internal/mission"
 	"github.com/vikash-paf/derelict-facility/internal/systems"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
@@ -22,30 +24,40 @@ const (
 type GameState uint8
 
 const (
-	GameStatePaused GameState = iota
+	GameStateMainMenu GameState = iota
 	GameStateRunning
+	GameStatePaused
 )
 
-// Flip the game state without branching, so it's a bit faster than using a switch statement.
+// Flip toggles between Paused and Running states
 func (s GameState) Flip() GameState {
-	return s ^ 1
+	if s == GameStatePaused {
+		return GameStateRunning
+	}
+	if s == GameStateRunning {
+		return GameStatePaused
+	}
+	return s
 }
 
 type Engine struct {
-	Display    display.Display
-	Audio      *audio.AudioManager
-	Map        *world.Map
-	EcsWorld   *ecs.World // Replaces Player
-	BaseTheme  world.TileVariant
-	TickerRate time.Duration
-	tickCount  int
-	Clock      *world.FacilityClock
-	State      GameState
-	Running    bool
-	PathLookup []bool // Pre-allocated array to avoid map allocations per frame
-	Pathfinder *world.Pathfinder
-	Messages   []string
-	Camera     *core.Camera
+	Display       display.Display
+	Audio         *audio.AudioManager
+	Map           *world.Map
+	EcsWorld      *ecs.World
+	BaseTheme     world.TileVariant
+	TickerRate    time.Duration
+	tickCount     int
+	Clock         *world.FacilityClock
+	State         GameState
+	Menu          *menu.MenuState
+	Running       bool
+	PathLookup    []bool // Pre-allocated array to avoid map allocations per frame
+	Pathfinder    *world.Pathfinder
+	Messages      []string
+	Camera        *core.Camera
+	ActiveMission *mission.MissionManifest // nil if using procedural map
+	ActiveLevelID string                   // current level ID within the mission
 }
 
 func NewEngine(
@@ -63,19 +75,23 @@ func NewEngine(
 		Audio:      audioMgr,
 		Map:        gameMap,
 		EcsWorld:   ecsWorld,
-		State:      GameStateRunning,
+		State:      GameStateMainMenu,
+		Menu:       menu.NewMenuState(),
 		Running:    true,
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
 		Clock:      world.NewFacilityClock(),
-		PathLookup: make([]bool, gameMap.Width*gameMap.Height),
-		Pathfinder: world.NewPathfinder(gameMap.Width, gameMap.Height),
 		Camera: &core.Camera{
 			X:      0,
 			Y:      0,
 			Width:  viewWidth,
 			Height: viewHeight,
 		},
+	}
+
+	if gameMap != nil {
+		e.PathLookup = make([]bool, gameMap.Width*gameMap.Height)
+		e.Pathfinder = world.NewPathfinder(gameMap.Width, gameMap.Height)
 	}
 
 	return e
@@ -93,7 +109,9 @@ func (e *Engine) Run() error {
 		events := e.Display.PollInput()
 		e.handleInputForGlobals(events)
 
-		if e.State == GameStateRunning {
+		if e.State == GameStateMainMenu {
+			e.handleMainMenuInput(events)
+		} else if e.State == GameStateRunning {
 			e.Update(events) // Calculate all game rules!
 		}
 
@@ -103,13 +121,256 @@ func (e *Engine) Run() error {
 	return nil
 }
 
+func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
+	for _, event := range events {
+		switch event.Key {
+		case rl.KeyUp:
+			e.Menu.SelectPrevious()
+			e.Audio.Play(audio.SoundFootstep)
+		case rl.KeyDown:
+			e.Menu.SelectNext()
+			e.Audio.Play(audio.SoundFootstep)
+		case rl.KeyEnter:
+			e.Audio.Play(audio.SoundTerminalAccess)
+			e.launchSelectedMission()
+		}
+	}
+}
+
+func (e *Engine) launchSelectedMission() {
+	item := e.Menu.GetSelectedItem()
+
+	if item.Manifest != nil {
+		e.ActiveMission = item.Manifest
+		e.ActiveLevelID = item.Manifest.StartLevel
+		e.loadLevelByID(e.ActiveLevelID, 0, false) // false = arriving at start, use @ marker
+		return
+	}
+
+	// Procedural fallback: generate a random map
+	e.ActiveMission = nil
+	e.ActiveLevelID = ""
+	seed := time.Now().UnixNano()
+	generator := world.NewFacilityGenerator(uint64(seed))
+	loadedMap, playerX, playerY := generator.Generate(120, 40)
+	e.activateMap(loadedMap, playerX, playerY, nil, "")
+	e.State = GameStateRunning
+}
+
+// loadLevelByID loads a specific level from the active mission manifest, preserving
+// the player's current security clearance across the transition.
+// goingUp indicates whether the player arrived via an ascending (<) or descending (>) elevator,
+// which determines which elevator in the destination they spawn next to.
+func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool) {
+	if e.ActiveMission == nil {
+		return
+	}
+
+	for _, lvl := range e.ActiveMission.Levels {
+		if lvl.ID != levelID {
+			continue
+		}
+
+		data, err := e.ActiveMission.LoadLevelMapData(lvl.File)
+		if err != nil {
+			e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Cannot load level %s", levelID))
+			return
+		}
+
+		loader := world.NewJSONMapLoader()
+		loadedMap, defaultX, defaultY, err := loader.LoadBytes(data)
+		if err != nil {
+			e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Cannot parse level %s", levelID))
+			return
+		}
+
+		// Spawn player at the arrival elevator, not at the @ marker.
+		// Going DOWN via > → arrive at the < elevator (IsUp=true) in destination.
+		// Going UP via < → arrive at the > elevator (IsUp=false) in destination.
+		spawnX, spawnY := arrivalSpawnPos(loadedMap, goingUp, defaultX, defaultY)
+
+		e.ActiveLevelID = levelID
+		e.activateMap(loadedMap, spawnX, spawnY, e.ActiveMission, levelID)
+		if existingClearance != 0 {
+			e.transferPlayerClearance(existingClearance)
+		}
+		e.State = GameStateRunning
+		return
+	}
+
+	e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Level %q not found in mission", levelID))
+}
+
+// arrivalSpawnPos finds the elevator in the destination map that the player steps out of.
+// goingUp=true means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
+// goingUp=false means player rode UP (<) so they arrive at the > elevator (IsUp=false).
+// Falls back to the map's @ marker position if no matching elevator exists.
+func arrivalSpawnPos(gameMap *world.Map, goingUp bool, fallbackX, fallbackY int) (int, int) {
+	for _, s := range gameMap.Stairways {
+		if s.IsUp == goingUp {
+			// Spawn one tile away from the elevator so the player isn't on top of it
+			return s.Pos.X + 1, s.Pos.Y
+		}
+	}
+	return fallbackX, fallbackY
+}
+
+// activateMap swaps out the engine's active map, rebuilds pathfinding, and constructs the ECS world.
+func (e *Engine) activateMap(gameMap *world.Map, playerX, playerY int, manifest *mission.MissionManifest, levelID string) {
+	e.Map = gameMap
+	e.PathLookup = make([]bool, gameMap.Width*gameMap.Height)
+	e.Pathfinder = world.NewPathfinder(gameMap.Width, gameMap.Height)
+	e.EcsWorld = buildMissionWorld(gameMap, playerX, playerY, manifest, levelID)
+	e.Messages = nil
+}
+
+// transferPlayerClearance copies clearance bits from a previous level into the current ECS world player.
+func (e *Engine) transferPlayerClearance(clearance uint32) {
+	targetMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			e.EcsWorld.PlayerControls[i].SecurityClearance = clearance
+			return
+		}
+	}
+}
+
+// playerClearance returns the current player's security clearance bitmask.
+func (e *Engine) playerClearance() uint32 {
+	targetMask := components.MaskPlayerControl
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			return e.EcsWorld.PlayerControls[i].SecurityClearance
+		}
+	}
+	return 0
+}
+
+// buildMissionWorld constructs the ECS world for a given map.
+// manifest and levelID are optional — if provided, stairway entities are given
+// their correct TargetLevelID based on position within the level sequence.
+func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *mission.MissionManifest, levelID string) *ecs.World {
+	ecsWorld := ecs.NewWorld()
+
+	playerEnt := ecsWorld.CreateEntity()
+	ecsWorld.AddPosition(playerEnt, components.Position{X: playerX, Y: playerY})
+	ecsWorld.AddGlyph(playerEnt, components.Glyph{Char: "@", Color: core.BrightWhite})
+	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
+		Autopilot: false,
+		Status:    components.PlayerStatusHealthy,
+	})
+
+	spawnGenerators(ecsWorld, gameMap)
+	spawnTerminals(ecsWorld, gameMap)
+	spawnDoors(ecsWorld, gameMap, playerX, playerY)
+	spawnStairways(ecsWorld, gameMap, manifest, levelID)
+
+	return ecsWorld
+}
+
+func spawnGenerators(w *ecs.World, gameMap *world.Map) {
+	for _, genInfo := range gameMap.PowerGenerators {
+		genEnt := w.CreateEntity()
+		w.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
+		w.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
+		w.AddSolid(genEnt)
+		w.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+		w.AddPowerGenerator(genEnt, components.PowerGenerator{
+			IsActive: false,
+			IsGlobal: genInfo.IsGlobal,
+		})
+	}
+}
+
+func spawnTerminals(w *ecs.World, gameMap *world.Map) {
+	for _, termPos := range gameMap.Terminals {
+		termEnt := w.CreateEntity()
+		w.AddPosition(termEnt, components.Position{X: termPos.X, Y: termPos.Y})
+		w.AddGlyph(termEnt, components.Glyph{Char: "T", Color: core.Cyan})
+		w.AddSolid(termEnt)
+		w.AddInteractable(termEnt, components.Interactable{Prompt: "Press [E] to Access Terminal"})
+		w.AddTerminal(termEnt, components.Terminal{HasSaved: false})
+		w.AddNarrative(termEnt, components.Narrative{
+			Text: "LOG: Sector 4 containment breach. All non-essential personnel evacuate immediately.",
+		})
+	}
+}
+
+func spawnDoors(w *ecs.World, gameMap *world.Map, playerX, playerY int) {
+	for _, doorPos := range gameMap.Doors {
+		if doorPos.X == playerX && doorPos.Y == playerY {
+			continue
+		}
+
+		doorEnt := w.CreateEntity()
+		w.AddPosition(doorEnt, components.Position{X: doorPos.X, Y: doorPos.Y})
+		w.AddGlyph(doorEnt, components.Glyph{Char: "+", Color: core.White})
+		w.AddSolid(doorEnt)
+		w.AddInteractable(doorEnt, components.Interactable{Prompt: "Press [E] to Open Door"})
+		w.AddDoor(doorEnt, components.Door{IsOpen: false})
+	}
+}
+
+// spawnStairways creates stairway entities and resolves target level IDs from the manifest level sequence.
+func spawnStairways(w *ecs.World, gameMap *world.Map, manifest *mission.MissionManifest, levelID string) {
+	if len(gameMap.Stairways) == 0 {
+		return
+	}
+
+	// Build prev/next level IDs from the manifest sequence
+	prevLevelID, nextLevelID := resolveLevelNeighbors(manifest, levelID)
+
+	for _, stairInfo := range gameMap.Stairways {
+		targetID := nextLevelID
+		if stairInfo.IsUp {
+			targetID = prevLevelID
+		}
+
+		dirGlyph, dirColor := ">", core.Yellow
+		prompt := "Press [E] to Descend"
+		if stairInfo.IsUp {
+			dirGlyph, dirColor = "<", core.Cyan
+			prompt = "Press [E] to Ascend"
+		}
+
+		stairEnt := w.CreateEntity()
+		w.AddPosition(stairEnt, components.Position{X: stairInfo.Pos.X, Y: stairInfo.Pos.Y})
+		w.AddGlyph(stairEnt, components.Glyph{Char: dirGlyph, Color: dirColor})
+		w.AddInteractable(stairEnt, components.Interactable{Prompt: prompt})
+		w.AddStairway(stairEnt, components.Stairway{
+			TargetLevelID: targetID,
+			IsUp:          stairInfo.IsUp,
+		})
+	}
+}
+
+// resolveLevelNeighbors returns the previous and next level IDs for the given level in a manifest.
+func resolveLevelNeighbors(manifest *mission.MissionManifest, levelID string) (prev, next string) {
+	if manifest == nil {
+		return "", ""
+	}
+	for i, lvl := range manifest.Levels {
+		if lvl.ID != levelID {
+			continue
+		}
+		if i > 0 {
+			prev = manifest.Levels[i-1].ID
+		}
+		if i < len(manifest.Levels)-1 {
+			next = manifest.Levels[i+1].ID
+		}
+		return
+	}
+	return
+}
+
 func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 	for _, event := range events {
 		if event.Quit || event.Key == rl.KeyQ {
 			e.Running = false
 			return
 		}
-		if event.Key == rl.KeyEscape {
+		if event.Key == rl.KeyEscape && e.State != GameStateMainMenu {
 			e.State = e.State.Flip()
 		}
 		if event.Key == rl.KeyEqual { // '+' key to Zoom In
@@ -121,6 +382,9 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 			currentScale := e.Display.GetScale()
 			e.Display.SetScale(currentScale - 0.25)
 			e.recalculateViewport()
+		}
+		if event.Key == rl.KeyM {
+			e.Audio.ToggleMute()
 		}
 	}
 }
@@ -150,6 +414,9 @@ func (e *Engine) Update(events []core.InputEvent) {
 }
 
 func (e *Engine) processSimulation(events []core.InputEvent) {
+	// Capture clearance before processing so we can transfer it on level change
+	clearanceBefore := e.playerClearance()
+
 	// Let the systems tick using the events we polled at the start of the frame!
 	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, func(msg string) {
 		// If the new message is the same as the last one, don't repeat it
@@ -163,6 +430,8 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		}
 	}, func(soundID string) {
 		e.Audio.Play(audio.SoundID(soundID))
+	}, func(targetLevelID string, goingUp bool) {
+		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp)
 	})
 
 	// Center camera on player
@@ -180,29 +449,24 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		return systems.IsSolidAt(e.EcsWorld, x, y)
 	})
 
-	// Calculate FOV
-	targetMask := components.MaskPlayerControl | components.MaskPosition
+	// Recalculate FOV based on current player position
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		targetMask := components.MaskPlayerControl | components.MaskPosition
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
-
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
-				// 1. Is the map tile a wall?
 				if !e.Map.IsWalkable(x, y) {
 					return true
 				}
-				// 2. Is there a Solid entity (like a closed door)?
 				return systems.IsSolidAt(e.EcsWorld, x, y)
 			}, func(x, y int) bool {
-				// Lit by power grid generator OR lit by natural daytime skylight (including spillover)
-				isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-				if isPowered {
+				if systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y) {
 					return true
 				}
 				tile := e.Map.GetTile(x, y)
 				return tile != nil && tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 			})
-			break // Compute FOV for the first player found
+			break
 		}
 	}
 }
@@ -220,30 +484,13 @@ func (e *Engine) updateCamera() {
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
+			newX := pos.X - e.Camera.Width/2
+			newY := pos.Y - e.Camera.Height/2
 
-			// Goal: player in the middle
-			newX := pos.X - (e.Camera.Width / 2)
-			newY := pos.Y - (e.Camera.Height / 2)
-
-			// Clamp to map boundaries
 			if newX < 0 {
 				newX = 0
 			}
 			if newY < 0 {
-				newY = 0
-			}
-			if newX > e.Map.Width-e.Camera.Width {
-				newX = e.Map.Width - e.Camera.Width
-			}
-			if newY > e.Map.Height-e.Camera.Height {
-				newY = e.Map.Height - e.Camera.Height
-			}
-
-			// Don't let the camera go negative if the map is smaller than the viewport
-			if e.Map.Width < e.Camera.Width {
-				newX = 0
-			}
-			if e.Map.Height < e.Camera.Height {
 				newY = 0
 			}
 
@@ -258,6 +505,13 @@ func (e *Engine) updateCamera() {
 // and other visual elements to the Display buffer.
 func (e *Engine) render() {
 	e.Display.BeginFrame()
+
+	if e.State == GameStateMainMenu {
+		e.Menu.Render(e.Display, e.Camera.Width, e.Camera.Height+8)
+		e.Display.EndFrame()
+		return
+	}
+
 	e.Display.Clear(core.Black) // Black background
 
 	// Determine active theme based on global states
@@ -267,9 +521,11 @@ func (e *Engine) render() {
 		activeTheme = world.TileVariantPaused
 	}
 
-	e.renderMapLayer(activeTheme)
-	systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
-	e.renderHUD()
+	if e.Map != nil && e.EcsWorld != nil {
+		e.renderMapLayer(activeTheme)
+		systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
+		e.renderHUD()
+	}
 
 	switch e.State {
 	case GameStatePaused:
@@ -477,8 +733,14 @@ func (e *Engine) renderHUD() {
 		e.drawText(2, hudY+2+i, "> "+msg, color)
 	}
 
-	controls := " [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    [ESC] Pause    [Q] Abort"
-	e.drawText(2, hudY+7, controls, core.Gray)
+	muteLabel := "[M] Mute"
+	controlsColor := core.Gray
+	if e.Audio.IsMuted() {
+		muteLabel = "[M] MUTED"
+		controlsColor = core.Red
+	}
+	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [ESC] Pause    [Q] Abort", muteLabel)
+	e.drawText(2, hudY+7, controls, controlsColor)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
