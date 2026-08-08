@@ -289,13 +289,9 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
 				if tile.Type == world.TileTypeFloor {
-					switch tile.Variant {
-					case 1: char = "."
-					case 2: char = ","
-					case 3: char = "`"
-					case 4: char = "'"
-					default: char = " "
-					}
+					char = "."
+					// Subdue floor tile contrast so walls and entities pop out cleanly
+					color = display.DarkenColor(color, 2)
 				}
 
 				if tile.Type == world.TileTypeWall {
@@ -329,13 +325,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			if tile.Explored {
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
 				if tile.Type == world.TileTypeFloor {
-					switch tile.Variant {
-					case 1: char = "."
-					case 2: char = ","
-					case 3: char = "`"
-					case 4: char = "'"
-					default: char = " "
-					}
+					char = "."
 				}
 				if tile.Type == world.TileTypeWall {
 					if char == "╬" || char == "#" || char == "█" || char == "▓" {
