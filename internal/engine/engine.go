@@ -383,6 +383,9 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 			e.Display.SetScale(currentScale - 0.25)
 			e.recalculateViewport()
 		}
+		if event.Key == rl.KeyM {
+			e.Audio.ToggleMute()
+		}
 	}
 }
 
@@ -730,8 +733,15 @@ func (e *Engine) renderHUD() {
 		e.drawText(2, hudY+2+i, "> "+msg, color)
 	}
 
-	controls := " [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    [ESC] Pause    [Q] Abort"
+	muteLabel := "[M] Mute"
+	if e.Audio.IsMuted() {
+		muteLabel = "[M] MUTED"
+	}
+	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [ESC] Pause    [Q] Abort", muteLabel)
 	e.drawText(2, hudY+7, controls, core.Gray)
+	if e.Audio.IsMuted() {
+		e.drawText(2, hudY+7, "[M] MUTED", core.Red)
+	}
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
