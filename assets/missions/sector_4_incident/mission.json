@@ -2,13 +2,23 @@
   "id": "sector_4_incident",
   "title": "MISSION 1: SECTOR 4 CONTAINMENT BREACH",
   "author": "System Architect",
-  "synopsis": "Investigate the silent distress beacon from Sector 4 research labs and restore life support.",
+  "synopsis": "Investigate Sector 4, descend into Sub-Level Labs, and restore the Deep Core Reactor.",
   "start_level": "level_01_surface",
   "levels": [
     {
       "id": "level_01_surface",
       "name": "Surface Hangar Bay & Sunlit Skylight Corridor",
       "file": "maps/level_01_surface.json"
+    },
+    {
+      "id": "level_02_labs",
+      "name": "Sub-Level Research Labs & Specimen Vault",
+      "file": "maps/level_02_labs.json"
+    },
+    {
+      "id": "level_03_reactor",
+      "name": "Deep Subcore Reactor & Turbine Complex",
+      "file": "maps/level_03_reactor.json"
     }
   ]
 }

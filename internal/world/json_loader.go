@@ -75,6 +75,18 @@ func (l *JSONMapLoader) LoadBytes(data []byte) (*Map, int, int, error) {
 			case '@': // Player start position
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				playerX, playerY = x, y
+			case '>': // Down Stairway / Elevator to next level
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				m.Stairways = append(m.Stairways, StairwayInfo{
+					Pos:  entity.Point{X: x, Y: y},
+					IsUp: false,
+				})
+			case '<': // Up Stairway / Elevator to previous level
+				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
+				m.Stairways = append(m.Stairways, StairwayInfo{
+					Pos:  entity.Point{X: x, Y: y},
+					IsUp: true,
+				})
 			default:
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 			}

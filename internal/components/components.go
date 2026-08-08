@@ -21,7 +21,15 @@ const (
 	MaskDoor
 	MaskTerminal
 	MaskNarrative
+	MaskStairway
 )
+
+// Stairway allows level transitions between maps when standing nearby and pressing [E].
+type Stairway struct {
+	TargetLevelID     string // e.g. "level_02_labs"
+	RequiredClearance uint32 // 0 for unlocked, otherwise required bitmask
+	IsUp              bool   // true for '<' (Up), false for '>' (Down)
+}
 
 // Narrative stores flavor text or logs associated with an entity.
 type Narrative struct {

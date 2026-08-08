@@ -1,6 +1,8 @@
 package systems
 
 import (
+	"fmt"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
@@ -23,7 +25,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string)) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string)) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -59,7 +61,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc, audioFunc)
+				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc, audioFunc, transitionFunc)
 			}
 
 			// Don't manually move if Autopilot is running
@@ -85,7 +87,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string)) {
+func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string)) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
@@ -203,6 +205,34 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 						}
 						saveState(w, gameMap)
 						logFunc("Checkpoint saved.")
+					}
+					return
+				}
+
+				// 4. Stairway / Elevator Level Transition
+				if (w.Masks[i] & components.MaskStairway) != 0 {
+					stair := &w.Stairways[i]
+					if stair.RequiredClearance != 0 && (playerClearance&stair.RequiredClearance) == 0 {
+						if audioFunc != nil {
+							audioFunc("access_denied")
+						}
+						logFunc("ELEVATOR LOCKED: Required Clearance Missing.")
+						return
+					}
+					if stair.TargetLevelID == "" {
+						logFunc("No connecting level found.")
+						return
+					}
+					if audioFunc != nil {
+						audioFunc("terminal_access")
+					}
+					direction := "Descending"
+					if stair.IsUp {
+						direction = "Ascending"
+					}
+					logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", direction, stair.TargetLevelID))
+					if transitionFunc != nil {
+						transitionFunc(stair.TargetLevelID)
 					}
 					return
 				}
