@@ -170,7 +170,9 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 
 	// Run AI movement every 2nd frame (approx 15 times a second)
 	if e.tickCount%6 == 0 {
-		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder)
+		systems.ProcessAutopilot(e.EcsWorld, e.Map, e.Pathfinder, func(soundID string) {
+			e.Audio.Play(audio.SoundID(soundID))
+		})
 	}
 
 	// Calculate sunlight spillover through open doors/corridors
