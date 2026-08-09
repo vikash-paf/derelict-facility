@@ -520,54 +520,65 @@ func (e *Engine) updateAudioModulation() {
 	}
 }
 
-func (e *Engine) updateCamera() {
+func (e *Engine) getPlayerPosition() (components.Position, bool) {
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
-			pos := e.EcsWorld.Positions[i]
-			cellWidth := float32(10)
-			cellHeight := float32(20)
-
-			// Player position in pixels (center of player tile)
-			playerPx := float32(pos.X)*cellWidth + cellWidth/2
-			playerPy := float32(pos.Y)*cellHeight + cellHeight/2
-
-			e.Camera.Target = rl.NewVector2(playerPx, playerPy)
-			e.Camera.Offset = rl.NewVector2(500, 300) // Center of 1000x600 viewport
-
-			// Clamp to map boundaries if map exists
-			if e.Map != nil {
-				mapW := float32(e.Map.Width) * cellWidth
-				mapH := float32(e.Map.Height) * cellHeight
-				viewW := float32(1000) / e.Camera.Zoom
-				viewH := float32(600) / e.Camera.Zoom
-
-				if mapW > viewW {
-					minX := viewW / 2
-					maxX := mapW - viewW / 2
-					if e.Camera.Target.X < minX {
-						e.Camera.Target.X = minX
-					} else if e.Camera.Target.X > maxX {
-						e.Camera.Target.X = maxX
-					}
-				} else {
-					e.Camera.Target.X = mapW / 2
-				}
-
-				if mapH > viewH {
-					minY := viewH / 2
-					maxY := mapH - viewH / 2
-					if e.Camera.Target.Y < minY {
-						e.Camera.Target.Y = minY
-					} else if e.Camera.Target.Y > maxY {
-						e.Camera.Target.Y = maxY
-					}
-				} else {
-					e.Camera.Target.Y = mapH / 2
-				}
-			}
-			break
+			return e.EcsWorld.Positions[i], true
 		}
+	}
+	return components.Position{}, false
+}
+
+func (e *Engine) clampCameraToMap(cellWidth, cellHeight float32) {
+	mapW := float32(e.Map.Width) * cellWidth
+	mapH := float32(e.Map.Height) * cellHeight
+	viewW := float32(1000) / e.Camera.Zoom
+	viewH := float32(600) / e.Camera.Zoom
+
+	if mapW > viewW {
+		minX := viewW / 2
+		maxX := mapW - viewW / 2
+		if e.Camera.Target.X < minX {
+			e.Camera.Target.X = minX
+		} else if e.Camera.Target.X > maxX {
+			e.Camera.Target.X = maxX
+		}
+	} else {
+		e.Camera.Target.X = mapW / 2
+	}
+
+	if mapH > viewH {
+		minY := viewH / 2
+		maxY := mapH - viewH / 2
+		if e.Camera.Target.Y < minY {
+			e.Camera.Target.Y = minY
+		} else if e.Camera.Target.Y > maxY {
+			e.Camera.Target.Y = maxY
+		}
+	} else {
+		e.Camera.Target.Y = mapH / 2
+	}
+}
+
+func (e *Engine) updateCamera() {
+	pos, found := e.getPlayerPosition()
+	if !found {
+		return
+	}
+	cellWidth := float32(10)
+	cellHeight := float32(20)
+
+	// Player position in pixels (center of player tile)
+	playerPx := float32(pos.X)*cellWidth + cellWidth/2
+	playerPy := float32(pos.Y)*cellHeight + cellHeight/2
+
+	e.Camera.Target = rl.NewVector2(playerPx, playerPy)
+	e.Camera.Offset = rl.NewVector2(500, 300) // Center of 1000x600 viewport
+
+	// Clamp to map boundaries if map exists
+	if e.Map != nil {
+		e.clampCameraToMap(cellWidth, cellHeight)
 	}
 }
 
@@ -623,10 +634,8 @@ func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
 }
 
-func (e *Engine) renderMapLayer(theme world.TileVariant, startX, endX, startY, endY int) {
+func (e *Engine) populatePathLookup() {
 	clear(e.PathLookup)
-
-	// Collect paths from all PlayerControl entities to draw the red autopilot line
 	targetMask := components.MaskPlayerControl
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
@@ -638,159 +647,159 @@ func (e *Engine) renderMapLayer(theme world.TileVariant, startX, endX, startY, e
 			}
 		}
 	}
+}
 
-	// Iterate over visible viewport bounds only
+func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color {
+	bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
+	sunColor := e.Clock.GetSunlightColor()
+	if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+		blendWeight := 0.40 * tile.SunlightIntensity
+		bgColor = core.LerpColor(bgColor, sunColor, blendWeight)
+	}
+
+	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+	if !isTilePowered && !isSunlitByDay {
+		if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
+		if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
+	}
+	return bgColor
+}
+
+func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.TileVariant) (string, core.Color) {
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
+	if char == "╬" || char == "#" || char == "█" || char == "▓" {
+		switch tile.Bitmask {
+		case 0: char = "O"
+		case 1, 4, 5: char = "║"
+		case 2, 8, 10: char = "═"
+		case 3: char = "╚"
+		case 6: char = "╔"
+		case 12: char = "╗"
+		case 9: char = "╝"
+		case 7: char = "╠"
+		case 14: char = "╦"
+		case 13: char = "╣"
+		case 11: char = "╩"
+		case 15: char = "╬"
+		}
+	}
+
+	sunColor := e.Clock.GetSunlightColor()
+	if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+		blendWeight := 0.45 * tile.SunlightIntensity
+		color = core.LerpColor(color, sunColor, blendWeight)
+	}
+	return char, color
+}
+
+func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileVariant) {
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
+
+	if tile.Type == world.TileTypeFloor {
+		bgColor := e.getFloorBackgroundColor(x, y, tile)
+		e.Display.DrawRect(x, y, bgColor)
+		return
+	}
+
+	if tile.Type == world.TileTypeWall {
+		char, color = e.getWallGlyphAndColor(x, y, tile, theme)
+	}
+
+	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+	if !isTilePowered && !isSunlitByDay {
+		if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
+		if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
+	}
+
+	e.Display.DrawText(x, y, char, color)
+}
+
+func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.TileVariant) {
+	if tile.Type == world.TileTypeFloor {
+		e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
+		return
+	}
+
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
+	if tile.Type == world.TileTypeWall {
+		char, _ = e.getWallGlyphAndColor(x, y, tile, theme)
+	}
+
+	dimColor := display.DarkenColor(color, 4)
+	e.Display.DrawText(x, y, char, dimColor)
+}
+
+func (e *Engine) renderSingleMapTile(x, y int, theme world.TileVariant) {
+	tile := e.Map.GetTile(x, y)
+	if tile == nil || tile.Type == world.TileTypeEmpty {
+		return
+	}
+
+	// 1. Draw Autopilot Path
+	if e.PathLookup[y*e.Map.Width+x] && (tile.Visible || tile.Explored) {
+		e.Display.DrawText(x, y, "*", core.Red)
+		return
+	}
+
+	// 2. Draw Visible Tiles
+	if tile.Visible {
+		e.renderVisibleTile(x, y, tile, theme)
+		return
+	}
+
+	// 3. Draw Explored (Fog-of-War) Tiles
+	if tile.Explored {
+		e.renderExploredTile(x, y, tile, theme)
+	}
+}
+
+func (e *Engine) renderMapLayer(theme world.TileVariant, startX, endX, startY, endY int) {
+	e.populatePathLookup()
+
 	for y := startY; y < endY; y++ {
 		for x := startX; x < endX; x++ {
-			tile := e.Map.GetTile(x, y)
-			if tile == nil {
-				continue
-			}
-
-			// 1. Draw Autopilot Path
-			isPathTile := e.PathLookup[y*e.Map.Width+x]
-			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(x, y, "*", core.Red)
-				continue
-			}
-
-			// 2. Draw Map Base
-			if tile.Type == world.TileTypeEmpty {
-				continue
-			}
-
-			if tile.Visible {
-				char, color := theme[tile.Type].Char, theme[tile.Type].Color
-
-				// Draw floor tile background fill using ambient daylight color
-				if tile.Type == world.TileTypeFloor {
-					bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
-					sunColor := e.Clock.GetSunlightColor()
-					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
-						blendWeight := 0.40 * tile.SunlightIntensity
-						bgColor = core.LerpColor(bgColor, sunColor, blendWeight)
-					}
-
-					isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-					isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
-					if !isTilePowered && !isSunlitByDay {
-						if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
-						if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
-					}
-
-					e.Display.DrawRect(x, y, bgColor)
-					continue
-				}
-
-				if tile.Type == world.TileTypeWall {
-					if char == "╬" || char == "#" || char == "█" || char == "▓" {
-						switch tile.Bitmask {
-						case 0: char = "O"
-						case 1, 4, 5: char = "║"
-						case 2, 8, 10: char = "═"
-						case 3: char = "╚"
-						case 6: char = "╔"
-						case 12: char = "╗"
-						case 9: char = "╝"
-						case 7: char = "╠"
-						case 14: char = "╦"
-						case 13: char = "╣"
-						case 11: char = "╩"
-						case 15: char = "╬"
-						}
-					}
-
-					sunColor := e.Clock.GetSunlightColor()
-					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
-						blendWeight := 0.45 * tile.SunlightIntensity
-						color = core.LerpColor(color, sunColor, blendWeight)
-					}
-				}
-
-				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-				isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
-				if !isTilePowered && !isSunlitByDay {
-					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
-					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
-				}
-
-				e.Display.DrawText(x, y, char, color)
-				continue
-			}
-
-			if tile.Explored {
-				if tile.Type == world.TileTypeFloor {
-					e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
-					continue
-				}
-				char, color := theme[tile.Type].Char, theme[tile.Type].Color
-				if tile.Type == world.TileTypeWall {
-					if char == "╬" || char == "#" || char == "█" || char == "▓" {
-						switch tile.Bitmask {
-						case 0: char = "O"
-						case 1, 4, 5: char = "║"
-						case 2, 8, 10: char = "═"
-						case 3: char = "╚"
-						case 6: char = "╔"
-						case 12: char = "╗"
-						case 9: char = "╝"
-						case 7: char = "╠"
-						case 14: char = "╦"
-						case 13: char = "╣"
-						case 11: char = "╩"
-						case 15: char = "╬"
-						}
-					}
-				}
-				dimColor := display.DarkenColor(color, 4)
-				e.Display.DrawText(x, y, char, dimColor)
-				continue
-			}
+			e.renderSingleMapTile(x, y, theme)
 		}
 	}
 }
 
-func (e *Engine) renderHUD() {
-	hudY := 30
-	divider := strings.Repeat("═", 100)
-	e.drawText(0, hudY, divider, core.Gray)
-
-	statusText := "HEALTHY"
-	autopilotEngaged := false
-	var interactPrompt string
-
+func (e *Engine) getPlayerControlAndPosition() (*components.PlayerControl, *components.Position, bool) {
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
-			control := e.EcsWorld.PlayerControls[i]
-			position := e.EcsWorld.Positions[i]
-			autopilotEngaged = control.Autopilot
-			statusText = control.Status.Title()
-
-			interactMask := components.MaskPosition | components.MaskInteractable
-			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
-				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
-					targetPos := e.EcsWorld.Positions[j]
-					dx := targetPos.X - position.X
-					dy := targetPos.Y - position.Y
-					if (dx*dx + dy*dy) <= 2 {
-						interact := e.EcsWorld.Interactables[j]
-						interactPrompt = interact.Prompt
-						break
-					}
-				}
-			}
-			break
+			return &e.EcsWorld.PlayerControls[i], &e.EcsWorld.Positions[i], true
 		}
 	}
+	return nil, nil, false
+}
 
+func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
+	interactMask := components.MaskPosition | components.MaskInteractable
+	for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
+		if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
+			targetPos := e.EcsWorld.Positions[j]
+			dx := targetPos.X - pX
+			dy := targetPos.Y - pY
+			if (dx*dx + dy*dy) <= 2 {
+				return e.EcsWorld.Interactables[j].Prompt
+			}
+		}
+	}
+	return ""
+}
+
+func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool) {
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
 	if autopilotEngaged {
 		e.drawText(22, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
 	} else {
 		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
+}
 
+func (e *Engine) drawHUDMissionAndClock(hudY int) {
 	missionText := " MISSION: PROCEDURAL "
 	missionColor := core.Gray
 	if e.ActiveMission != nil {
@@ -805,20 +814,26 @@ func (e *Engine) renderHUD() {
 		clockX = 55
 	}
 	e.drawText(clockX, hudY+1, clockText, core.Yellow)
+}
 
+func (e *Engine) drawHUDInteractionPrompt(hudY int, interactPrompt string) {
 	if interactPrompt != "" {
 		if e.tickCount%30 < 15 {
 			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), core.Green)
 		}
 	}
+}
 
+func (e *Engine) drawHUDMessages(hudY int) {
 	for i, msg := range e.Messages {
 		color := core.Green
 		if i == 0 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 3) }
 		if i == 1 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 1) }
 		e.drawText(2, hudY+3+i, "> "+msg, color)
 	}
+}
 
+func (e *Engine) drawHUDControls(hudY int) {
 	muteLabel := "[M] Mute"
 	controlsColor := core.Gray
 	if e.Audio.IsMuted() {
@@ -827,6 +842,30 @@ func (e *Engine) renderHUD() {
 	}
 	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [C] CRT Filter    [ESC] Pause    [Q] Abort", muteLabel)
 	e.drawText(2, hudY+7, controls, controlsColor)
+}
+
+func (e *Engine) renderHUD() {
+	hudY := 30
+	divider := strings.Repeat("═", 100)
+	e.drawText(0, hudY, divider, core.Gray)
+
+	ctrl, pos, found := e.getPlayerControlAndPosition()
+
+	statusText := "HEALTHY"
+	autopilotEngaged := false
+	var interactPrompt string
+
+	if found {
+		statusText = ctrl.Status.Title()
+		autopilotEngaged = ctrl.Autopilot
+		interactPrompt = e.getNearbyInteractionPrompt(pos.X, pos.Y)
+	}
+
+	e.drawHUDStatusAndNav(hudY, statusText, autopilotEngaged)
+	e.drawHUDMissionAndClock(hudY)
+	e.drawHUDInteractionPrompt(hudY, interactPrompt)
+	e.drawHUDMessages(hudY)
+	e.drawHUDControls(hudY)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
