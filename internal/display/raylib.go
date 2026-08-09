@@ -39,7 +39,7 @@ uniform vec4 colDiffuse;
 out vec4 finalColor;
 void main() {
     vec4 texelColor = texture(texture0, fragTexCoord);
-    float scanline = sin(fragTexCoord.y * 760.0) * 0.08;
+    float scanline = sin(fragTexCoord.y * 1520.0) * 0.08;
     vec3 crtColor = texelColor.rgb - vec3(scanline);
     vec2 uv = fragTexCoord - 0.5;
     float vignette = 1.0 - dot(uv, uv) * 0.15;

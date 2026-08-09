@@ -19,11 +19,11 @@ import (
 
 const (
 	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
-	cellWidth  = 10
-	cellHeight = 20
+	cellWidth  = 20
+	cellHeight = 40
 	hudHeight  = 8
-	viewportW  = 1000
-	viewportH  = 600
+	viewportW  = 2000
+	viewportH  = 1200
 	virtualW   = 100
 	virtualH   = 38
 	hudY       = 30
@@ -152,7 +152,7 @@ func (e *Engine) launchSelectedMission() {
 	if item.Manifest != nil {
 		e.ActiveMission = item.Manifest
 		e.ActiveLevelID = item.Manifest.StartLevel
-		e.loadLevelByID(e.ActiveLevelID, 0, false) // false = arriving at start, use @ marker
+		e.loadLevelByID(e.ActiveLevelID, 0, false, true) // true = starting fresh, spawn at @
 		return
 	}
 
@@ -170,7 +170,7 @@ func (e *Engine) launchSelectedMission() {
 // the player's current security clearance across the transition.
 // goingUp indicates whether the player arrived via an ascending (<) or descending (>) elevator,
 // which determines which elevator in the destination they spawn next to.
-func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool) {
+func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool, isStart bool) {
 	if e.ActiveMission == nil {
 		return
 	}
@@ -193,10 +193,14 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 			return
 		}
 
-		// Spawn player at the arrival elevator, not at the @ marker.
-		// Going DOWN via > → arrive at the < elevator (IsUp=true) in destination.
-		// Going UP via < → arrive at the > elevator (IsUp=false) in destination.
-		spawnX, spawnY := arrivalSpawnPos(loadedMap, goingUp, defaultX, defaultY)
+		// Spawn player at the map's start position (@ marker) if starting fresh,
+		// otherwise spawn next to the correct elevator arrival stairway.
+		var spawnX, spawnY int
+		if isStart {
+			spawnX, spawnY = defaultX, defaultY
+		} else {
+			spawnX, spawnY = arrivalSpawnPos(loadedMap, goingUp, defaultX, defaultY)
+		}
 
 		e.ActiveLevelID = levelID
 		e.activateMap(loadedMap, spawnX, spawnY, e.ActiveMission, levelID)
@@ -439,7 +443,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	}, func(soundID string) {
 		e.Audio.Play(audio.SoundID(soundID))
 	}, func(targetLevelID string, goingUp bool) {
-		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp)
+		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp, false)
 	})
 
 	// Center camera on player

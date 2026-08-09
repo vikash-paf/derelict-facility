@@ -18,9 +18,9 @@ func main() {
 	hudHeight := 8                   // Room for message log HUD
 	windowWidth, windowHeight := viewWidth, viewHeight+hudHeight
 
-	cellWidth := int32(10)
-	cellHeight := int32(20)
-	fontSize := int32(20)
+	cellWidth := int32(20)
+	cellHeight := int32(40)
+	fontSize := int32(40)
 	fontPath := "fonts/FiraCodeNFBoldMono.ttf"
 
 	disp := display.NewRaylibDisplay(cellWidth, cellHeight, fontSize, fontPath)
