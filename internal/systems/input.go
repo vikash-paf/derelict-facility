@@ -64,8 +64,15 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc, audioFunc, transitionFunc)
 			}
 
-			// Don't manually move if Autopilot is running
-			if controls.Autopilot || (dx == 0 && dy == 0) {
+			// Disable autopilot if manual movement keys are pressed
+			if dx != 0 || dy != 0 {
+				if controls.Autopilot {
+					controls.Autopilot = false
+					controls.CurrentPath = nil
+				}
+			}
+
+			if dx == 0 && dy == 0 {
 				continue
 			}
 
