@@ -18,7 +18,15 @@ import (
 )
 
 const (
-	fovRadius = 8 // cool stuff can be done here, like a dimming torch light
+	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
+	cellWidth  = 10
+	cellHeight = 20
+	hudHeight  = 8
+	viewportW  = 1000
+	viewportH  = 600
+	virtualW   = 100
+	virtualH   = 38
+	hudY       = 30
 )
 
 type GameState uint8
@@ -483,15 +491,15 @@ func (e *Engine) getVisibleTileRange() (int, int, int, int) {
 	if e.Map == nil {
 		return 0, 0, 0, 0
 	}
-	cellWidth := float32(10)
-	cellHeight := float32(20)
-	viewW := float32(1000) / e.Camera.Zoom
-	viewH := float32(600) / e.Camera.Zoom
+	cellWidthVal := float32(cellWidth)
+	cellHeightVal := float32(cellHeight)
+	viewW := float32(viewportW) / e.Camera.Zoom
+	viewH := float32(viewportH) / e.Camera.Zoom
 
-	startX := int((e.Camera.Target.X - viewW/2) / cellWidth)
-	endX := int((e.Camera.Target.X + viewW/2) / cellWidth) + 1
-	startY := int((e.Camera.Target.Y - viewH/2) / cellHeight)
-	endY := int((e.Camera.Target.Y + viewH/2) / cellHeight) + 1
+	startX := int((e.Camera.Target.X - viewW/2) / cellWidthVal)
+	endX := int((e.Camera.Target.X + viewW/2) / cellWidthVal) + 1
+	startY := int((e.Camera.Target.Y - viewH/2) / cellHeightVal)
+	endY := int((e.Camera.Target.Y + viewH/2) / cellHeightVal) + 1
 
 	if startX < 0 { startX = 0 }
 	if endX > e.Map.Width { endX = e.Map.Width }
@@ -530,11 +538,11 @@ func (e *Engine) getPlayerPosition() (components.Position, bool) {
 	return components.Position{}, false
 }
 
-func (e *Engine) clampCameraToMap(cellWidth, cellHeight float32) {
-	mapW := float32(e.Map.Width) * cellWidth
-	mapH := float32(e.Map.Height) * cellHeight
-	viewW := float32(1000) / e.Camera.Zoom
-	viewH := float32(600) / e.Camera.Zoom
+func (e *Engine) clampCameraToMap(cellWidthVal, cellHeightVal float32) {
+	mapW := float32(e.Map.Width) * cellWidthVal
+	mapH := float32(e.Map.Height) * cellHeightVal
+	viewW := float32(viewportW) / e.Camera.Zoom
+	viewH := float32(viewportH) / e.Camera.Zoom
 
 	if mapW > viewW {
 		minX := viewW / 2
@@ -566,19 +574,19 @@ func (e *Engine) updateCamera() {
 	if !found {
 		return
 	}
-	cellWidth := float32(10)
-	cellHeight := float32(20)
+	cellWidthVal := float32(cellWidth)
+	cellHeightVal := float32(cellHeight)
 
 	// Player position in pixels (center of player tile)
-	playerPx := float32(pos.X)*cellWidth + cellWidth/2
-	playerPy := float32(pos.Y)*cellHeight + cellHeight/2
+	playerPx := float32(pos.X)*cellWidthVal + cellWidthVal/2
+	playerPy := float32(pos.Y)*cellHeightVal + cellHeightVal/2
 
 	e.Camera.Target = rl.NewVector2(playerPx, playerPy)
-	e.Camera.Offset = rl.NewVector2(500, 300) // Center of 1000x600 viewport
+	e.Camera.Offset = rl.NewVector2(float32(viewportW)/2, float32(viewportH)/2)
 
 	// Clamp to map boundaries if map exists
 	if e.Map != nil {
-		e.clampCameraToMap(cellWidth, cellHeight)
+		e.clampCameraToMap(cellWidthVal, cellHeightVal)
 	}
 }
 
@@ -588,7 +596,7 @@ func (e *Engine) render() {
 	e.Display.BeginFrame()
 
 	if e.State == GameStateMainMenu {
-		e.Menu.Render(e.Display, 100, 38)
+		e.Menu.Render(e.Display, virtualW, virtualH)
 		e.Display.EndFrame()
 		return
 	}
