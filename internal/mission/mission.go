@@ -126,9 +126,8 @@ func (m *MissionManifest) LoadLevelMapData(fileRelativePath string) ([]byte, err
 	fullPath := fmt.Sprintf("%s/%s", m.Dir, fileRelativePath)
 
 	embedPath := fullPath
-	if strings.HasPrefix(embedPath, "assets/") {
-		embedPath = strings.TrimPrefix(embedPath, "assets/")
-	}
+	embedPath, _ = strings.CutPrefix(embedPath, "assets/")
+
 	data, err := assets.AssetsFS.ReadFile(embedPath)
 	if err == nil {
 		return data, nil
