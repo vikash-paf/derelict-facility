@@ -126,42 +126,34 @@ func (w *World) RemoveTerminal(entity Entity) {
 	w.Masks[entity] &^= components.MaskTerminal
 }
 
-// IsPlayer returns true if the entity has player controls.
 func (w *World) IsPlayer(e Entity) bool {
 	return (w.Masks[e] & components.MaskPlayerControl) != 0
 }
 
-// IsPowerGenerator returns true if the entity has a power generator component.
 func (w *World) IsPowerGenerator(e Entity) bool {
 	return (w.Masks[e] & components.MaskPowerGenerator) != 0
 }
 
-// IsDoor returns true if the entity has a door component.
 func (w *World) IsDoor(e Entity) bool {
 	return (w.Masks[e] & components.MaskDoor) != 0
 }
 
-// IsTerminal returns true if the entity has a terminal component.
 func (w *World) IsTerminal(e Entity) bool {
 	return (w.Masks[e] & components.MaskTerminal) != 0
 }
 
-// IsStairway returns true if the entity has a stairway component.
 func (w *World) IsStairway(e Entity) bool {
 	return (w.Masks[e] & components.MaskStairway) != 0
 }
 
-// HasPosition returns true if the entity has a position component.
 func (w *World) HasPosition(e Entity) bool {
 	return (w.Masks[e] & components.MaskPosition) != 0
 }
 
-// IsSolid returns true if the entity is solid.
 func (w *World) IsSolid(e Entity) bool {
 	return (w.Masks[e] & components.MaskSolid) != 0
 }
 
-// IsInteractable returns true if the entity has an interactable component.
 func (w *World) IsInteractable(e Entity) bool {
 	return (w.Masks[e] & components.MaskInteractable) != 0
 }
