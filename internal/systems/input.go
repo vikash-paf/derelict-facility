@@ -107,7 +107,7 @@ func interactWithGenerator(w *ecs.World, ent ecs.Entity, logFunc func(string), a
 			glyph.Char = "X"
 		}
 	}
-	
+
 	if gen.IsActive {
 		w.Interactables[ent].Prompt = "Press [E] to Turn Off Generator"
 	} else {
@@ -221,14 +221,23 @@ func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, 
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+func handleInteraction(
+	world *ecs.World,
+	playerX, playerY int,
+	gameMap *world.Map,
+	activeMission *mission.MissionManifest,
+	activeLevelID string,
+	logFunc func(string),
+	audioFunc func(string),
+	transitionFunc func(string, bool),
+) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
 	foundPlayer := false
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if w.IsPlayer(i) {
-			playerClearance = w.PlayerControls[i].SecurityClearance
+		if world.IsPlayer(i) {
+			playerClearance = world.PlayerControls[i].SecurityClearance
 			playerEntID = i
 			foundPlayer = true
 			break
@@ -236,8 +245,8 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, a
 	}
 
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if w.HasPosition(i) && w.IsInteractable(i) {
-			pos := w.Positions[i]
+		if world.HasPosition(i) && world.IsInteractable(i) {
+			pos := world.Positions[i]
 			// Check adjacency
 			dx := pos.X - playerX
 			dy := pos.Y - playerY
@@ -245,17 +254,17 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, a
 
 			if distSq <= 2 {
 				switch {
-				case w.IsPowerGenerator(i):
-					interactWithGenerator(w, i, logFunc, audioFunc)
+				case world.IsPowerGenerator(i):
+					interactWithGenerator(world, i, logFunc, audioFunc)
 					return
-				case w.IsDoor(i):
-					interactWithDoor(w, i, playerClearance, logFunc, audioFunc)
+				case world.IsDoor(i):
+					interactWithDoor(world, i, playerClearance, logFunc, audioFunc)
 					return
-				case w.IsTerminal(i):
-					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
+				case world.IsTerminal(i):
+					interactWithTerminal(world, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
 					return
-				case w.IsStairway(i):
-					interactWithStairway(w, i, playerClearance, logFunc, audioFunc, transitionFunc)
+				case world.IsStairway(i):
+					interactWithStairway(world, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
 				}
 			}

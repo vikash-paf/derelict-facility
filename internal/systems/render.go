@@ -56,7 +56,7 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 	}
 
 	// Pass 1: Render all non-player entities
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		isPlayer := w.IsPlayer(i)
 		if !isPlayer {
 			renderEntity(i)
@@ -64,7 +64,7 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 	}
 
 	// Pass 2: Render all player entities
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		isPlayer := w.IsPlayer(i)
 		if isPlayer {
 			renderEntity(i)
