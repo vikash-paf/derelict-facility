@@ -215,12 +215,12 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 }
 
 // arrivalSpawnPos finds the elevator in the destination map that the player steps out of.
-// goingUp=true means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
-// goingUp=false means player rode UP (<) so they arrive at the > elevator (IsUp=false).
+// goingUp=true means player rode UP (<) so they arrive at the > elevator (IsUp=false).
+// goingUp=false means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
 // Falls back to the map's @ marker position if no matching elevator exists.
 func arrivalSpawnPos(gameMap *world.Map, goingUp bool, fallbackX, fallbackY int) (int, int) {
 	for _, s := range gameMap.Stairways {
-		if s.IsUp == goingUp {
+		if s.IsUp == !goingUp {
 			// Spawn one tile away from the elevator so the player isn't on top of it
 			return s.Pos.X + 1, s.Pos.Y
 		}
