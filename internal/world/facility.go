@@ -207,22 +207,22 @@ func (f FacilityGenerator) calculateWallBitmasks(m *Map) {
 			// North
 			tN := m.GetTile(x, y-1)
 			if tN != nil && tN.Type == TileTypeWall {
-				mask |= 1 // 0001
+				mask |= WallConnectionNorth // 0001
 			}
 			// East
 			tE := m.GetTile(x+1, y)
 			if tE != nil && tE.Type == TileTypeWall {
-				mask |= 2 // 0010
+				mask |= WallConnectionEast // 0010
 			}
 			// South
 			tS := m.GetTile(x, y+1)
 			if tS != nil && tS.Type == TileTypeWall {
-				mask |= 4 // 0100
+				mask |= WallConnectionSouth // 0100
 			}
 			// West
 			tW := m.GetTile(x-1, y)
 			if tW != nil && tW.Type == TileTypeWall {
-				mask |= 8 // 1000
+				mask |= WallConnectionWest // 1000
 			}
 
 			tile.Bitmask = mask

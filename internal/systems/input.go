@@ -7,14 +7,14 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
+	"github.com/vikash-paf/derelict-facility/internal/mission"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
 // IsSolidAt checks if any solid entity occupies the given coordinates.
 func IsSolidAt(w *ecs.World, x, y int) bool {
-	targetMask := components.MaskPosition | components.MaskSolid
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if w.HasPosition(i) && w.IsSolid(i) {
 			pos := w.Positions[i]
 			if pos.X == x && pos.Y == y {
 				return true
@@ -25,7 +25,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -47,10 +47,8 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 		}
 	}
 
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if w.IsPlayer(i) && w.HasPosition(i) {
 			controls := &w.PlayerControls[i]
 			positions := &w.Positions[i]
 
@@ -61,11 +59,18 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc, audioFunc, transitionFunc)
+				handleInteraction(w, positions.X, positions.Y, gameMap, activeMission, activeLevelID, logFunc, audioFunc, transitionFunc)
 			}
 
-			// Don't manually move if Autopilot is running
-			if controls.Autopilot || (dx == 0 && dy == 0) {
+			// Disable autopilot if manual movement keys are pressed
+			if dx != 0 || dy != 0 {
+				if controls.Autopilot {
+					controls.Autopilot = false
+					controls.CurrentPath = nil
+				}
+			}
+
+			if dx == 0 && dy == 0 {
 				continue
 			}
 
@@ -87,153 +92,179 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+func interactWithGenerator(w *ecs.World, ent ecs.Entity, logFunc func(string), audioFunc func(string)) {
+	gen := &w.PowerGenerators[ent]
+	gen.IsActive = !gen.IsActive
+
+	// Update visual feedback and interaction prompt
+	if (w.Masks[ent] & components.MaskGlyph) != 0 {
+		glyph := &w.Glyphs[ent]
+		if gen.IsActive {
+			glyph.Color = core.Green
+			glyph.Char = "⚡"
+		} else {
+			glyph.Color = core.Red
+			glyph.Char = "X"
+		}
+	}
+
+	if gen.IsActive {
+		w.Interactables[ent].Prompt = "Press [E] to Turn Off Generator"
+	} else {
+		w.Interactables[ent].Prompt = "Press [E] to Turn On Generator"
+	}
+
+	if audioFunc != nil {
+		audioFunc("generator_toggle")
+	}
+
+	if gen.IsActive {
+		logFunc("Power Generator turned on.")
+	} else {
+		logFunc("Power Generator turned off.")
+	}
+}
+
+func interactWithDoor(w *ecs.World, ent ecs.Entity, playerClearance uint32, logFunc func(string), audioFunc func(string)) {
+	door := &w.Doors[ent]
+
+	// Check security clearance
+	if door.RequiredClearance != 0 && (playerClearance&door.RequiredClearance) == 0 {
+		if audioFunc != nil {
+			audioFunc("access_denied")
+		}
+		logFunc("ACCESS DENIED: Required Clearance Missing.")
+		return
+	}
+
+	door.IsOpen = !door.IsOpen
+
+	if door.IsOpen {
+		w.RemoveSolid(ent)
+		w.Interactables[ent].Prompt = "Press [E] to Close Door"
+		if (w.Masks[ent] & components.MaskGlyph) != 0 {
+			w.Glyphs[ent].Char = "/"
+			w.Glyphs[ent].Color = core.Gray
+		}
+		if audioFunc != nil {
+			audioFunc("door_open")
+		}
+		logFunc("Door opened.")
+	} else {
+		w.AddSolid(ent)
+		w.Interactables[ent].Prompt = "Press [E] to Open Door"
+		if (w.Masks[ent] & components.MaskGlyph) != 0 {
+			w.Glyphs[ent].Char = "+"
+			w.Glyphs[ent].Color = core.White
+		}
+		if audioFunc != nil {
+			audioFunc("door_close")
+		}
+		logFunc("Door closed.")
+	}
+}
+
+func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string)) {
+	terminal := &w.Terminals[ent]
+
+	if audioFunc != nil {
+		audioFunc("terminal_access")
+	}
+
+	// Grant clearance if terminal has it
+	if terminal.GrantClearance != 0 && foundPlayer {
+		if (w.PlayerControls[playerEntID].SecurityClearance & terminal.GrantClearance) == 0 {
+			w.PlayerControls[playerEntID].SecurityClearance |= terminal.GrantClearance
+			logFunc("SECURITY CLEARANCE UPDATED.")
+		}
+	}
+
+	// If it has narrative data, display it
+	if (w.Masks[ent] & components.MaskNarrative) != 0 {
+		logFunc(w.Narratives[ent].Text)
+	}
+
+	if !terminal.HasSaved {
+		terminal.HasSaved = true
+		w.Interactables[ent].Prompt = "Press [E] to Access Terminal"
+		if (w.Masks[ent] & components.MaskGlyph) != 0 {
+			w.Glyphs[ent].Color = core.Green
+		}
+		saveState(w, gameMap, activeMission, activeLevelID)
+		logFunc("Checkpoint saved.")
+	}
+}
+
+func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+	stair := &w.Stairways[ent]
+	if stair.RequiredClearance != 0 && (playerClearance&stair.RequiredClearance) == 0 {
+		if audioFunc != nil {
+			audioFunc("access_denied")
+		}
+		logFunc("ELEVATOR LOCKED: Required Clearance Missing.")
+		return
+	}
+	if stair.TargetLevelID == "" {
+		logFunc("No connecting level found.")
+		return
+	}
+	if audioFunc != nil {
+		audioFunc("terminal_access")
+	}
+	dirLabel := "Descending"
+	if stair.IsUp {
+		dirLabel = "Ascending"
+	}
+	logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", dirLabel, stair.TargetLevelID))
+	if transitionFunc != nil {
+		transitionFunc(stair.TargetLevelID, stair.IsUp)
+	}
+}
+
+func handleInteraction(
+	world *ecs.World,
+	playerX, playerY int,
+	gameMap *world.Map,
+	activeMission *mission.MissionManifest,
+	activeLevelID string,
+	logFunc func(string),
+	audioFunc func(string),
+	transitionFunc func(string, bool),
+) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
 	foundPlayer := false
-	playerMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & playerMask) == playerMask {
-			playerClearance = w.PlayerControls[i].SecurityClearance
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if world.IsPlayer(i) {
+			playerClearance = world.PlayerControls[i].SecurityClearance
 			playerEntID = i
 			foundPlayer = true
 			break
 		}
 	}
 
-	targetMask := components.MaskPosition | components.MaskInteractable
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
-			pos := w.Positions[i]
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if world.HasPosition(i) && world.IsInteractable(i) {
+			pos := world.Positions[i]
 			// Check adjacency
 			dx := pos.X - playerX
 			dy := pos.Y - playerY
 			distSq := dx*dx + dy*dy
 
 			if distSq <= 2 {
-				// 1. Power Generator
-				if (w.Masks[i] & components.MaskPowerGenerator) != 0 {
-					gen := &w.PowerGenerators[i]
-					gen.IsActive = !gen.IsActive
-
-					// Update visual feedback
-					if (w.Masks[i] & components.MaskGlyph) != 0 {
-						glyph := &w.Glyphs[i]
-						if gen.IsActive {
-							glyph.Color = core.Green
-							glyph.Char = "⚡"
-						} else {
-							glyph.Color = core.Red
-							glyph.Char = "X"
-						}
-					}
-					if audioFunc != nil {
-						audioFunc("generator_toggle")
-					}
-					logFunc("Power Generator toggled.")
+				switch {
+				case world.IsPowerGenerator(i):
+					interactWithGenerator(world, i, logFunc, audioFunc)
 					return
-				}
-
-				// 2. Door
-				if (w.Masks[i] & components.MaskDoor) != 0 {
-					door := &w.Doors[i]
-
-					// Check security clearance
-					if door.RequiredClearance != 0 && (playerClearance&door.RequiredClearance) == 0 {
-						if audioFunc != nil {
-							audioFunc("access_denied")
-						}
-						logFunc("ACCESS DENIED: Required Clearance Missing.")
-						return
-					}
-
-					door.IsOpen = !door.IsOpen
-
-					if door.IsOpen {
-						w.RemoveSolid(i)
-						w.Interactables[i].Prompt = "Press [E] to Close Door"
-						if (w.Masks[i] & components.MaskGlyph) != 0 {
-							w.Glyphs[i].Char = "/"
-							w.Glyphs[i].Color = core.Gray
-						}
-						if audioFunc != nil {
-							audioFunc("door_open")
-						}
-						logFunc("Door opened.")
-					} else {
-						w.AddSolid(i)
-						w.Interactables[i].Prompt = "Press [E] to Open Door"
-						if (w.Masks[i] & components.MaskGlyph) != 0 {
-							w.Glyphs[i].Char = "+"
-							w.Glyphs[i].Color = core.White
-						}
-						if audioFunc != nil {
-							audioFunc("door_close")
-						}
-						logFunc("Door closed.")
-					}
+				case world.IsDoor(i):
+					interactWithDoor(world, i, playerClearance, logFunc, audioFunc)
 					return
-				}
-
-				// 3. Terminal
-				if (w.Masks[i] & components.MaskTerminal) != 0 {
-					terminal := &w.Terminals[i]
-
-					if audioFunc != nil {
-						audioFunc("terminal_access")
-					}
-
-					// Grant clearance if terminal has it
-					if terminal.GrantClearance != 0 && foundPlayer {
-						if (w.PlayerControls[playerEntID].SecurityClearance & terminal.GrantClearance) == 0 {
-							w.PlayerControls[playerEntID].SecurityClearance |= terminal.GrantClearance
-							logFunc("SECURITY CLEARANCE UPDATED.")
-						}
-					}
-
-					// If it has narrative data, display it
-					if (w.Masks[i] & components.MaskNarrative) != 0 {
-						logFunc(w.Narratives[i].Text)
-					}
-
-					if !terminal.HasSaved {
-						terminal.HasSaved = true
-						w.Interactables[i].Prompt = "Press [E] to Access Terminal"
-						if (w.Masks[i] & components.MaskGlyph) != 0 {
-							w.Glyphs[i].Color = core.Green
-						}
-						saveState(w, gameMap)
-						logFunc("Checkpoint saved.")
-					}
+				case world.IsTerminal(i):
+					interactWithTerminal(world, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
 					return
-				}
-
-				// 4. Stairway / Elevator Level Transition
-				if (w.Masks[i] & components.MaskStairway) != 0 {
-					stair := &w.Stairways[i]
-					if stair.RequiredClearance != 0 && (playerClearance&stair.RequiredClearance) == 0 {
-						if audioFunc != nil {
-							audioFunc("access_denied")
-						}
-						logFunc("ELEVATOR LOCKED: Required Clearance Missing.")
-						return
-					}
-					if stair.TargetLevelID == "" {
-						logFunc("No connecting level found.")
-						return
-					}
-					if audioFunc != nil {
-						audioFunc("terminal_access")
-					}
-					dirLabel := "Descending"
-					if stair.IsUp {
-						dirLabel = "Ascending"
-					}
-					logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", dirLabel, stair.TargetLevelID))
-					if transitionFunc != nil {
-						transitionFunc(stair.TargetLevelID, stair.IsUp)
-					}
+				case world.IsStairway(i):
+					interactWithStairway(world, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
 				}
 			}
@@ -243,9 +274,8 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 
 // IsPowerActive returns true if at least one global generator is active.
 func IsPowerActive(w *ecs.World) bool {
-	targetMask := components.MaskPowerGenerator
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if w.IsPowerGenerator(i) {
 			gen := w.PowerGenerators[i]
 			if gen.IsActive && gen.IsGlobal {
 				return true
@@ -261,9 +291,8 @@ func IsPowerActiveAt(w *ecs.World, gameMap *world.Map, x, y int) bool {
 		return true
 	}
 
-	targetMask := components.MaskPosition | components.MaskPowerGenerator
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if w.HasPosition(i) && w.IsPowerGenerator(i) {
 			gen := w.PowerGenerators[i]
 			if !gen.IsActive || gen.IsGlobal {
 				continue

@@ -5,15 +5,18 @@ import (
 	"os"
 
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
+	"github.com/vikash-paf/derelict-facility/internal/mission"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
 type SaveGameData struct {
-	World *ecs.World
-	Map   *world.Map
+	World         *ecs.World
+	Map           *world.Map
+	ActiveMission *mission.MissionManifest
+	ActiveLevelID string
 }
 
-func saveState(w *ecs.World, m *world.Map) {
+func saveState(w *ecs.World, m *world.Map, activeMission *mission.MissionManifest, activeLevelID string) {
 	file, err := os.Create("savegame.sav")
 	if err != nil {
 		return
@@ -21,8 +24,10 @@ func saveState(w *ecs.World, m *world.Map) {
 	defer file.Close()
 
 	data := SaveGameData{
-		World: w,
-		Map:   m,
+		World:         w,
+		Map:           m,
+		ActiveMission: activeMission,
+		ActiveLevelID: activeLevelID,
 	}
 
 	encoder := gob.NewEncoder(file)

@@ -10,11 +10,11 @@ import (
 
 // RenderEntities loops through all entities possessing BOTH a Sprite or Glyph and Position component
 // and draws them to the active display buffer if they are within exactly visible map tiles and camera viewport.
-func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, cam *core.Camera) {
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, bounds core.ViewportBounds) {
+	renderEntity := func(i ecs.Entity) {
 		// Must have a position to be rendered
 		if (w.Masks[i] & components.MaskPosition) == 0 {
-			continue
+			return
 		}
 
 		hasSprite := (w.Masks[i] & components.MaskSprite) != 0
@@ -22,18 +22,18 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, cam 
 
 		// Must have at least one visual representation
 		if !hasSprite && !hasGlyph {
-			continue
+			return
 		}
 
 		pos := w.Positions[i]
 
 		// Culling: Only render if within the camera's view
-		if !cam.IsInView(pos.X, pos.Y) {
-			continue
+		if pos.X < bounds.StartX || pos.X >= bounds.EndX || pos.Y < bounds.StartY || pos.Y >= bounds.EndY {
+			return
 		}
 
 		// Is it the player? Check the mask for the PlayerControl bit
-		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+		isPlayer := w.IsPlayer(i)
 
 		// Check if it's an active generator
 		isGenerator := (w.Masks[i] & components.MaskPowerGenerator) != 0
@@ -42,18 +42,32 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, cam 
 		if !isPlayer && !isActiveGenerator {
 			tile := gameMap.GetTile(pos.X, pos.Y)
 			if tile == nil || !tile.Visible {
-				continue
+				return
 			}
 		}
 
-		screenX, screenY := cam.WorldToScreen(pos.X, pos.Y)
-
 		if hasSprite {
 			spr := w.Sprites[i]
-			disp.DrawSprite(screenX, screenY, spr.SheetX, spr.SheetY, spr.Color)
+			disp.DrawSprite(pos.X, pos.Y, spr.SheetX, spr.SheetY, spr.Color)
 		} else if hasGlyph {
 			glyph := w.Glyphs[i]
-			disp.DrawText(screenX, screenY, glyph.Char, glyph.Color)
+			disp.DrawText(pos.X, pos.Y, glyph.Char, glyph.Color)
+		}
+	}
+
+	// Pass 1: Render all non-player entities
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		isPlayer := w.IsPlayer(i)
+		if !isPlayer {
+			renderEntity(i)
+		}
+	}
+
+	// Pass 2: Render all player entities
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		isPlayer := w.IsPlayer(i)
+		if isPlayer {
+			renderEntity(i)
 		}
 	}
 }

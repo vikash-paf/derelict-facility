@@ -22,6 +22,8 @@ type AudioManager struct {
 	initialized bool
 	muted       bool
 	sounds      map[SoundID]rl.Sound
+	music       rl.Music
+	musicLoaded bool
 }
 
 func NewAudioManager() *AudioManager {
@@ -60,6 +62,38 @@ func (a *AudioManager) Init() {
 			a.sounds[id] = sound
 		}
 	}
+
+	// Try loading ambient music from assets if present
+	musicData, err := assets.AssetsFS.ReadFile("audio/ambient.wav")
+	if err == nil && len(musicData) > 0 {
+		a.music = rl.LoadMusicStreamFromMemory(".wav", musicData, int32(len(musicData)))
+		if a.music.CtxData != nil {
+			a.musicLoaded = true
+			rl.PlayMusicStream(a.music)
+			rl.SetMusicVolume(a.music, 0.5)
+		}
+	}
+}
+
+func (a *AudioManager) Update() {
+	if !a.initialized || a.muted || !a.musicLoaded {
+		return
+	}
+	rl.UpdateMusicStream(a.music)
+}
+
+func (a *AudioManager) SetMusicVolume(volume float32) {
+	if !a.initialized || !a.musicLoaded {
+		return
+	}
+	rl.SetMusicVolume(a.music, volume)
+}
+
+func (a *AudioManager) SetMusicPitch(pitch float32) {
+	if !a.initialized || !a.musicLoaded {
+		return
+	}
+	rl.SetMusicPitch(a.music, pitch)
 }
 
 func (a *AudioManager) Play(id SoundID) {
@@ -74,6 +108,11 @@ func (a *AudioManager) Play(id SoundID) {
 // ToggleMute flips the mute state and returns the new state.
 func (a *AudioManager) ToggleMute() bool {
 	a.muted = !a.muted
+	if a.muted && a.musicLoaded {
+		rl.PauseMusicStream(a.music)
+	} else if !a.muted && a.musicLoaded {
+		rl.ResumeMusicStream(a.music)
+	}
 	return a.muted
 }
 
@@ -85,6 +124,10 @@ func (a *AudioManager) IsMuted() bool {
 func (a *AudioManager) Close() {
 	if !a.initialized {
 		return
+	}
+	if a.musicLoaded {
+		rl.UnloadMusicStream(a.music)
+		a.musicLoaded = false
 	}
 	for _, sound := range a.sounds {
 		rl.UnloadSound(sound)

@@ -12,10 +12,8 @@ import (
 
 // ProcessAutopilot handles AI pathing and automated door opening for PlayerControl entities.
 func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder, audioFunc func(string)) {
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) != targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if !w.IsPlayer(i) || !w.HasPosition(i) {
 			continue
 		}
 
@@ -53,7 +51,7 @@ func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder, au
 	}
 }
 
-// findRandomRoomPath picks a random room and returns a path if reachable (up to 5 attempts).
+// findRandomRoomPath shuffles and searches for any reachable room, choosing a walkable target tile within it.
 func findRandomRoomPath(
 	w *ecs.World,
 	gameMap *world.Map,
@@ -67,11 +65,29 @@ func findRandomRoomPath(
 
 	start := entity.Point{X: startPos.X, Y: startPos.Y}
 
-	for attempt := 0; attempt < 5; attempt++ {
-		room := gameMap.Rooms[rand.Intn(len(gameMap.Rooms))]
-		targetX, targetY := room.Center()
-		target := entity.Point{X: targetX, Y: targetY}
+	// Shuffle rooms to ensure randomness without giving up early
+	shuffledRooms := make([]world.Rect, len(gameMap.Rooms))
+	copy(shuffledRooms, gameMap.Rooms)
+	rand.Shuffle(len(shuffledRooms), func(i, j int) {
+		shuffledRooms[i], shuffledRooms[j] = shuffledRooms[j], shuffledRooms[i]
+	})
 
+	for _, room := range shuffledRooms {
+		var walkablePoints []entity.Point
+		for rx := room.X1; rx <= room.X2; rx++ {
+			for ry := room.Y1; ry <= room.Y2; ry++ {
+				if gameMap.IsWalkable(rx, ry) && isTileTraversable(w, gameMap, rx, ry, clearance) {
+					walkablePoints = append(walkablePoints, entity.Point{X: rx, Y: ry})
+				}
+			}
+		}
+
+		if len(walkablePoints) == 0 {
+			continue
+		}
+
+		// Choose a random walkable target inside the selected room
+		target := walkablePoints[rand.Intn(len(walkablePoints))]
 		path := pf.FindPath(gameMap, start, target, func(x, y int) bool {
 			return isTileTraversable(w, gameMap, x, y, clearance)
 		})
@@ -90,12 +106,8 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 		return false
 	}
 
-	doorMask := components.MaskPosition | components.MaskDoor
-	solidMask := components.MaskPosition | components.MaskSolid
-
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		mask := w.Masks[i]
-		if (mask & solidMask) != solidMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if !w.HasPosition(i) || !w.IsSolid(i) {
 			continue
 		}
 
@@ -105,7 +117,7 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 		}
 
 		// If solid entity is a door, check if player has clearance to unlock it
-		if (mask & doorMask) == doorMask {
+		if w.IsDoor(i) {
 			door := w.Doors[i]
 			return door.RequiredClearance == 0 || (clearance&door.RequiredClearance) != 0
 		}
@@ -118,10 +130,8 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 
 // tryAutoOpenDoor automatically unlocks and opens closed doors when encountered on autopilot.
 func tryAutoOpenDoor(w *ecs.World, step entity.Point, clearance uint32, audioFunc func(string)) {
-	doorMask := components.MaskPosition | components.MaskDoor
-
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & doorMask) != doorMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if !w.HasPosition(i) || !w.IsDoor(i) {
 			continue
 		}
 

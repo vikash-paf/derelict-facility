@@ -191,19 +191,19 @@ func (l *JSONMapLoader) calculateWallBitmasks(m *Map) {
 
 			// North
 			if tN := m.GetTile(x, y-1); tN != nil && tN.Type == TileTypeWall {
-				mask |= 1
+				mask |= WallConnectionNorth
 			}
 			// East
 			if tE := m.GetTile(x+1, y); tE != nil && tE.Type == TileTypeWall {
-				mask |= 2
+				mask |= WallConnectionEast
 			}
 			// South
 			if tS := m.GetTile(x, y+1); tS != nil && tS.Type == TileTypeWall {
-				mask |= 4
+				mask |= WallConnectionSouth
 			}
 			// West
 			if tW := m.GetTile(x-1, y); tW != nil && tW.Type == TileTypeWall {
-				mask |= 8
+				mask |= WallConnectionWest
 			}
 
 			tile.Bitmask = mask

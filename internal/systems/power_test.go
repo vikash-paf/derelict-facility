@@ -12,7 +12,7 @@ func TestPowerGrid_GlobalVsLocal(t *testing.T) {
 	w := ecs.NewWorld()
 	gameMap := world.NewMap(50, 50)
 	gameMap.Rooms = []world.Rect{
-		{X1: 0, Y1: 0, X2: 10, Y2: 10},  // Room 0
+		{X1: 0, Y1: 0, X2: 10, Y2: 10},   // Room 0
 		{X1: 20, Y1: 20, X2: 30, Y2: 30}, // Room 1
 	}
 

@@ -18,7 +18,15 @@ import (
 )
 
 const (
-	fovRadius = 8 // cool stuff can be done here, like a dimming torch light
+	fovRadius  = 8 // cool stuff can be done here, like a dimming torch light
+	cellWidth  = 20
+	cellHeight = 40
+	hudHeight  = 8
+	viewportW  = 2000
+	viewportH  = 1200
+	virtualW   = 100
+	virtualH   = 38
+	hudY       = 30
 )
 
 type GameState uint8
@@ -55,7 +63,7 @@ type Engine struct {
 	PathLookup    []bool // Pre-allocated array to avoid map allocations per frame
 	Pathfinder    *world.Pathfinder
 	Messages      []string
-	Camera        *core.Camera
+	Camera        rl.Camera2D
 	ActiveMission *mission.MissionManifest // nil if using procedural map
 	ActiveLevelID string                   // current level ID within the mission
 }
@@ -81,11 +89,9 @@ func NewEngine(
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
 		Clock:      world.NewFacilityClock(),
-		Camera: &core.Camera{
-			X:      0,
-			Y:      0,
-			Width:  viewWidth,
-			Height: viewHeight,
+		Camera: rl.Camera2D{
+			Zoom:   1.0,
+			Offset: rl.NewVector2(500, 300), // center of 1000x600 viewport
 		},
 	}
 
@@ -108,6 +114,9 @@ func (e *Engine) Run() error {
 
 		events := e.Display.PollInput()
 		e.handleInputForGlobals(events)
+
+		// Update audio stream (music playback)
+		e.Audio.Update()
 
 		if e.State == GameStateMainMenu {
 			e.handleMainMenuInput(events)
@@ -143,7 +152,7 @@ func (e *Engine) launchSelectedMission() {
 	if item.Manifest != nil {
 		e.ActiveMission = item.Manifest
 		e.ActiveLevelID = item.Manifest.StartLevel
-		e.loadLevelByID(e.ActiveLevelID, 0, false) // false = arriving at start, use @ marker
+		e.loadLevelByID(e.ActiveLevelID, 0, false, true) // true = starting fresh, spawn at @
 		return
 	}
 
@@ -161,7 +170,7 @@ func (e *Engine) launchSelectedMission() {
 // the player's current security clearance across the transition.
 // goingUp indicates whether the player arrived via an ascending (<) or descending (>) elevator,
 // which determines which elevator in the destination they spawn next to.
-func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool) {
+func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool, isStart bool) {
 	if e.ActiveMission == nil {
 		return
 	}
@@ -184,10 +193,14 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 			return
 		}
 
-		// Spawn player at the arrival elevator, not at the @ marker.
-		// Going DOWN via > → arrive at the < elevator (IsUp=true) in destination.
-		// Going UP via < → arrive at the > elevator (IsUp=false) in destination.
-		spawnX, spawnY := arrivalSpawnPos(loadedMap, goingUp, defaultX, defaultY)
+		// Spawn player at the map's start position (@ marker) if starting fresh,
+		// otherwise spawn next to the correct elevator arrival stairway.
+		var spawnX, spawnY int
+		if isStart {
+			spawnX, spawnY = defaultX, defaultY
+		} else {
+			spawnX, spawnY = arrivalSpawnPos(loadedMap, goingUp, defaultX, defaultY)
+		}
 
 		e.ActiveLevelID = levelID
 		e.activateMap(loadedMap, spawnX, spawnY, e.ActiveMission, levelID)
@@ -202,12 +215,12 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 }
 
 // arrivalSpawnPos finds the elevator in the destination map that the player steps out of.
-// goingUp=true means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
-// goingUp=false means player rode UP (<) so they arrive at the > elevator (IsUp=false).
+// goingUp=true means player rode UP (<) so they arrive at the > elevator (IsUp=false).
+// goingUp=false means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
 // Falls back to the map's @ marker position if no matching elevator exists.
 func arrivalSpawnPos(gameMap *world.Map, goingUp bool, fallbackX, fallbackY int) (int, int) {
 	for _, s := range gameMap.Stairways {
-		if s.IsUp == goingUp {
+		if s.IsUp == !goingUp {
 			// Spawn one tile away from the elevator so the player isn't on top of it
 			return s.Pos.X + 1, s.Pos.Y
 		}
@@ -226,9 +239,8 @@ func (e *Engine) activateMap(gameMap *world.Map, playerX, playerY int, manifest 
 
 // transferPlayerClearance copies clearance bits from a previous level into the current ECS world player.
 func (e *Engine) transferPlayerClearance(clearance uint32) {
-	targetMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
 			e.EcsWorld.PlayerControls[i].SecurityClearance = clearance
 			return
 		}
@@ -237,9 +249,8 @@ func (e *Engine) transferPlayerClearance(clearance uint32) {
 
 // playerClearance returns the current player's security clearance bitmask.
 func (e *Engine) playerClearance() uint32 {
-	targetMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
 			return e.EcsWorld.PlayerControls[i].SecurityClearance
 		}
 	}
@@ -274,7 +285,7 @@ func spawnGenerators(w *ecs.World, gameMap *world.Map) {
 		w.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
 		w.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
 		w.AddSolid(genEnt)
-		w.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+		w.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Turn On Generator"})
 		w.AddPowerGenerator(genEnt, components.PowerGenerator{
 			IsActive: false,
 			IsGlobal: genInfo.IsGlobal,
@@ -374,31 +385,30 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 			e.State = e.State.Flip()
 		}
 		if event.Key == rl.KeyEqual { // '+' key to Zoom In
-			currentScale := e.Display.GetScale()
-			e.Display.SetScale(currentScale + 0.25)
-			e.recalculateViewport()
+			e.Camera.Zoom += 0.25
+			if e.Camera.Zoom > 3.0 {
+				e.Camera.Zoom = 3.0
+			}
+			e.updateCamera()
 		}
 		if event.Key == rl.KeyMinus { // '-' key to Zoom Out
-			currentScale := e.Display.GetScale()
-			e.Display.SetScale(currentScale - 0.25)
-			e.recalculateViewport()
+			e.Camera.Zoom -= 0.25
+			if e.Camera.Zoom < 0.5 {
+				e.Camera.Zoom = 0.5
+			}
+			e.updateCamera()
 		}
 		if event.Key == rl.KeyM {
 			e.Audio.ToggleMute()
+		}
+		if event.Key == rl.KeyC {
+			e.Display.ToggleShader()
 		}
 	}
 }
 
 func (e *Engine) recalculateViewport() {
-	gw, gh := e.Display.GetDimensions()
-	hudHeight := 8
-	if gh > hudHeight {
-		e.Camera.Width = gw
-		e.Camera.Height = gh - hudHeight
-	} else {
-		e.Camera.Width = gw
-		e.Camera.Height = gh
-	}
+	// No-op: Virtual resolution rendering handles scaling automatically.
 }
 
 func (e *Engine) Update(events []core.InputEvent) {
@@ -418,7 +428,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	clearanceBefore := e.playerClearance()
 
 	// Let the systems tick using the events we polled at the start of the frame!
-	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, func(msg string) {
+	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, e.ActiveMission, e.ActiveLevelID, func(msg string) {
 		// If the new message is the same as the last one, don't repeat it
 		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
 			return
@@ -431,7 +441,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	}, func(soundID string) {
 		e.Audio.Play(audio.SoundID(soundID))
 	}, func(targetLevelID string, goingUp bool) {
-		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp)
+		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp, false)
 	})
 
 	// Center camera on player
@@ -450,9 +460,8 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	})
 
 	// Recalculate FOV based on current player position
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		targetMask := components.MaskPlayerControl | components.MaskPosition
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
 			pos := e.EcsWorld.Positions[i]
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
 				if !e.Map.IsWalkable(x, y) {
@@ -479,25 +488,118 @@ func (e *Engine) Resume() {
 	e.State = GameStateRunning
 }
 
-func (e *Engine) updateCamera() {
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+func (e *Engine) getVisibleTileRange() (int, int, int, int) {
+	if e.Map == nil {
+		return 0, 0, 0, 0
+	}
+	cellWidthVal := float32(cellWidth)
+	cellHeightVal := float32(cellHeight)
+	viewW := float32(viewportW) / e.Camera.Zoom
+	viewH := float32(viewportH) / e.Camera.Zoom
+
+	startX := int((e.Camera.Target.X - viewW/2) / cellWidthVal)
+	endX := int((e.Camera.Target.X+viewW/2)/cellWidthVal) + 1
+	startY := int((e.Camera.Target.Y - viewH/2) / cellHeightVal)
+	endY := int((e.Camera.Target.Y+viewH/2)/cellHeightVal) + 1
+
+	if startX < 0 {
+		startX = 0
+	}
+	if endX > e.Map.Width {
+		endX = e.Map.Width
+	}
+	if startY < 0 {
+		startY = 0
+	}
+	if endY > e.Map.Height {
+		endY = e.Map.Height
+	}
+
+	return startX, endX, startY, endY
+}
+
+func (e *Engine) updateAudioModulation() {
+	if e.EcsWorld == nil {
+		return
+	}
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
 			pos := e.EcsWorld.Positions[i]
-			newX := pos.X - e.Camera.Width/2
-			newY := pos.Y - e.Camera.Height/2
-
-			if newX < 0 {
-				newX = 0
+			isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, pos.X, pos.Y)
+			if isPowered {
+				e.Audio.SetMusicVolume(0.4)
+				e.Audio.SetMusicPitch(1.0)
+			} else {
+				// Eerie unpowered room effect: lower volume, lower pitch
+				e.Audio.SetMusicVolume(0.18)
+				e.Audio.SetMusicPitch(0.82)
 			}
-			if newY < 0 {
-				newY = 0
-			}
-
-			e.Camera.X = newX
-			e.Camera.Y = newY
 			break
 		}
+	}
+}
+
+func (e *Engine) getPlayerPosition() (components.Position, bool) {
+	if e.EcsWorld == nil {
+		return components.Position{}, false
+	}
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
+			return e.EcsWorld.Positions[i], true
+		}
+	}
+	return components.Position{}, false
+}
+
+func (e *Engine) clampCameraToMap(cellWidthVal, cellHeightVal float32) {
+	mapW := float32(e.Map.Width) * cellWidthVal
+	mapH := float32(e.Map.Height) * cellHeightVal
+	viewW := float32(viewportW) / e.Camera.Zoom
+	viewH := float32(viewportH) / e.Camera.Zoom
+
+	if mapW > viewW {
+		minX := viewW / 2
+		maxX := mapW - viewW/2
+		if e.Camera.Target.X < minX {
+			e.Camera.Target.X = minX
+		} else if e.Camera.Target.X > maxX {
+			e.Camera.Target.X = maxX
+		}
+	} else {
+		e.Camera.Target.X = mapW / 2
+	}
+
+	if mapH > viewH {
+		minY := viewH / 2
+		maxY := mapH - viewH/2
+		if e.Camera.Target.Y < minY {
+			e.Camera.Target.Y = minY
+		} else if e.Camera.Target.Y > maxY {
+			e.Camera.Target.Y = maxY
+		}
+	} else {
+		e.Camera.Target.Y = mapH / 2
+	}
+}
+
+func (e *Engine) updateCamera() {
+	pos, found := e.getPlayerPosition()
+	if !found {
+		return
+	}
+	cellWidthVal := float32(cellWidth)
+	cellHeightVal := float32(cellHeight)
+
+	// Player position in pixels (center of player tile)
+	playerPx := float32(pos.X)*cellWidthVal + cellWidthVal/2
+	playerPy := float32(pos.Y)*cellHeightVal + cellHeightVal/2
+
+	e.Camera.Target = rl.NewVector2(playerPx, playerPy)
+	e.Camera.Offset = rl.NewVector2(float32(viewportW)/2, float32(viewportH)/2)
+
+	// Clamp to map boundaries if map exists
+	if e.Map != nil {
+		e.clampCameraToMap(cellWidthVal, cellHeightVal)
 	}
 }
 
@@ -507,7 +609,7 @@ func (e *Engine) render() {
 	e.Display.BeginFrame()
 
 	if e.State == GameStateMainMenu {
-		e.Menu.Render(e.Display, e.Camera.Width, e.Camera.Height+8)
+		e.Menu.Render(e.Display, virtualW, virtualH)
 		e.Display.EndFrame()
 		return
 	}
@@ -522,8 +624,19 @@ func (e *Engine) render() {
 	}
 
 	if e.Map != nil && e.EcsWorld != nil {
-		e.renderMapLayer(activeTheme)
-		systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
+		startX, endX, startY, endY := e.getVisibleTileRange()
+		bounds := core.ViewportBounds{
+			StartX: startX,
+			EndX:   endX,
+			StartY: startY,
+			EndY:   endY,
+		}
+
+		rl.BeginMode2D(e.Camera)
+		e.renderMapLayer(activeTheme, startX, endX, startY, endY)
+		systems.RenderEntities(e.EcsWorld, e.Display, e.Map, bounds)
+		rl.EndMode2D()
+
 		e.renderHUD()
 	}
 
@@ -542,13 +655,10 @@ func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
 }
 
-func (e *Engine) renderMapLayer(theme world.TileVariant) {
+func (e *Engine) populatePathLookup() {
 	clear(e.PathLookup)
-
-	// Collect paths from all PlayerControl entities to draw the red autopilot line
-	targetMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
 			ctrl := e.EcsWorld.PlayerControls[i]
 			if ctrl.Autopilot {
 				for _, p := range ctrl.CurrentPath {
@@ -557,162 +667,177 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 			}
 		}
 	}
+}
 
-	// Iterate over viewport bounds ONLY
-	for y := e.Camera.Y; y < e.Camera.Y+e.Camera.Height; y++ {
-		for x := e.Camera.X; x < e.Camera.X+e.Camera.Width; x++ {
-			tile := e.Map.GetTile(x, y)
-			if tile == nil {
-				continue
-			}
+func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color {
+	bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
+	sunColor := e.Clock.GetSunlightColor()
+	if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+		blendWeight := 0.40 * tile.SunlightIntensity
+		bgColor = core.LerpColor(bgColor, sunColor, blendWeight)
+	}
 
-			// Translate world X,Y to screen coordinates
-			screenX, screenY := e.Camera.WorldToScreen(x, y)
+	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+	if !isTilePowered && !isSunlitByDay {
+		if tile.Distance > 3 {
+			bgColor = display.DarkenColor(bgColor, 2)
+		}
+		if tile.Distance > 5 {
+			bgColor = display.DarkenColor(bgColor, 2)
+		}
+	}
+	return bgColor
+}
 
-			// 1. Draw Autopilot Path
-			isPathTile := e.PathLookup[y*e.Map.Width+x]
-			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(screenX, screenY, "*", core.Red)
-				continue
-			}
+func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.TileVariant) (string, core.Color) {
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
+	if char == "╬" || char == "#" || char == "█" || char == "▓" {
+		switch tile.Bitmask {
+		case world.WallBitmaskIsolated:
+			char = "O"
+		case world.WallBitmaskNorthOnly, world.WallBitmaskSouthOnly, world.WallBitmaskNorthSouth:
+			char = "║"
+		case world.WallBitmaskEastOnly, world.WallBitmaskWestOnly, world.WallBitmaskEastWest:
+			char = "═"
+		case world.WallBitmaskNorthEast:
+			char = "╚"
+		case world.WallBitmaskEastSouth:
+			char = "╔"
+		case world.WallBitmaskSouthWest:
+			char = "╗"
+		case world.WallBitmaskWestNorth:
+			char = "╝"
+		case world.WallBitmaskNorthEastSouth:
+			char = "╠"
+		case world.WallBitmaskEastSouthWest:
+			char = "╦"
+		case world.WallBitmaskSouthWestNorth:
+			char = "╣"
+		case world.WallBitmaskWestNorthEast:
+			char = "╩"
+		case world.WallBitmaskIntersection:
+			char = "╬"
+		}
+	}
 
-			// 2. Draw Map Base
-			if tile.Type == world.TileTypeEmpty {
-				continue
-			}
+	sunColor := e.Clock.GetSunlightColor()
+	if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
+		blendWeight := 0.45 * tile.SunlightIntensity
+		color = core.LerpColor(color, sunColor, blendWeight)
+	}
+	return char, color
+}
 
-			if tile.Visible {
-				char, color := theme[tile.Type].Char, theme[tile.Type].Color
+func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileVariant) {
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 
-				// Draw floor tile background fill using ambient daylight color
-				if tile.Type == world.TileTypeFloor {
-					bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
-					sunColor := e.Clock.GetSunlightColor()
-					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
-						blendWeight := 0.40 * tile.SunlightIntensity
-						bgColor = core.LerpColor(bgColor, sunColor, blendWeight)
-					}
+	if tile.Type == world.TileTypeFloor {
+		bgColor := e.getFloorBackgroundColor(x, y, tile)
+		e.Display.DrawRect(x, y, bgColor)
+		return
+	}
 
-					isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-					isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
-					if !isTilePowered && !isSunlitByDay {
-						if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
-						if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
-					}
+	if tile.Type == world.TileTypeWall {
+		char, color = e.getWallGlyphAndColor(x, y, tile, theme)
+	}
 
-					e.Display.DrawRect(screenX, screenY, bgColor)
-					continue
-				}
+	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
+	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
+	if !isTilePowered && !isSunlitByDay {
+		if tile.Distance > 3 {
+			color = display.DarkenColor(color, 2)
+		}
+		if tile.Distance > 5 {
+			color = display.DarkenColor(color, 2)
+		}
+	}
 
-				if tile.Type == world.TileTypeWall {
-					if char == "╬" || char == "#" || char == "█" || char == "▓" {
-						switch tile.Bitmask {
-						case 0: char = "O"
-						case 1, 4, 5: char = "║"
-						case 2, 8, 10: char = "═"
-						case 3: char = "╚"
-						case 6: char = "╔"
-						case 12: char = "╗"
-						case 9: char = "╝"
-						case 7: char = "╠"
-						case 14: char = "╦"
-						case 13: char = "╣"
-						case 11: char = "╩"
-						case 15: char = "╬"
-						}
-					}
+	e.Display.DrawText(x, y, char, color)
+}
 
-					sunColor := e.Clock.GetSunlightColor()
-					if tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime() {
-						blendWeight := 0.45 * tile.SunlightIntensity
-						color = core.LerpColor(color, sunColor, blendWeight)
-					}
-				}
+func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.TileVariant) {
+	if tile.Type == world.TileTypeFloor {
+		e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
+		return
+	}
 
-				isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
-				isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
-				if !isTilePowered && !isSunlitByDay {
-					if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
-					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
-				}
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
+	if tile.Type == world.TileTypeWall {
+		char, _ = e.getWallGlyphAndColor(x, y, tile, theme)
+	}
 
-				e.Display.DrawText(screenX, screenY, char, color)
-				continue
-			}
+	dimColor := display.DarkenColor(color, 4)
+	e.Display.DrawText(x, y, char, dimColor)
+}
 
-			if tile.Explored {
-				if tile.Type == world.TileTypeFloor {
-					e.Display.DrawRect(screenX, screenY, core.Color{R: 8, G: 8, B: 12, A: 255})
-					continue
-				}
-				char, color := theme[tile.Type].Char, theme[tile.Type].Color
-				if tile.Type == world.TileTypeWall {
-					if char == "╬" || char == "#" || char == "█" || char == "▓" {
-						switch tile.Bitmask {
-						case 0: char = "O"
-						case 1, 4, 5: char = "║"
-						case 2, 8, 10: char = "═"
-						case 3: char = "╚"
-						case 6: char = "╔"
-						case 12: char = "╗"
-						case 9: char = "╝"
-						case 7: char = "╠"
-						case 14: char = "╦"
-						case 13: char = "╣"
-						case 11: char = "╩"
-						case 15: char = "╬"
-						}
-					}
-				}
-				dimColor := display.DarkenColor(color, 4)
-				e.Display.DrawText(screenX, screenY, char, dimColor)
-				continue
-			}
+func (e *Engine) renderSingleMapTile(x, y int, theme world.TileVariant) {
+	tile := e.Map.GetTile(x, y)
+	if tile == nil || tile.Type == world.TileTypeEmpty {
+		return
+	}
+
+	// 1. Draw Autopilot Path
+	if e.PathLookup[y*e.Map.Width+x] && (tile.Visible || tile.Explored) {
+		e.Display.DrawText(x, y, "*", core.Red)
+		return
+	}
+
+	// 2. Draw Visible Tiles
+	if tile.Visible {
+		e.renderVisibleTile(x, y, tile, theme)
+		return
+	}
+
+	// 3. Draw Explored (Fog-of-War) Tiles
+	if tile.Explored {
+		e.renderExploredTile(x, y, tile, theme)
+	}
+}
+
+func (e *Engine) renderMapLayer(theme world.TileVariant, startX, endX, startY, endY int) {
+	e.populatePathLookup()
+
+	for y := startY; y < endY; y++ {
+		for x := startX; x < endX; x++ {
+			e.renderSingleMapTile(x, y, theme)
 		}
 	}
 }
 
-func (e *Engine) renderHUD() {
-	hudY := e.Camera.Height
-	divider := strings.Repeat("═", e.Camera.Width)
-	e.drawText(0, hudY, divider, core.Gray)
-
-	statusText := "HEALTHY"
-	autopilotEngaged := false
-	var interactPrompt string
-
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
-			control := e.EcsWorld.PlayerControls[i]
-			position := e.EcsWorld.Positions[i]
-			autopilotEngaged = control.Autopilot
-			statusText = control.Status.Title()
-
-			interactMask := components.MaskPosition | components.MaskInteractable
-			for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
-				if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
-					targetPos := e.EcsWorld.Positions[j]
-					dx := targetPos.X - position.X
-					dy := targetPos.Y - position.Y
-					if (dx*dx + dy*dy) <= 2 {
-						interact := e.EcsWorld.Interactables[j]
-						interactPrompt = interact.Prompt
-						break
-					}
-				}
-			}
-			break
+func (e *Engine) getPlayerControlAndPosition() (*components.PlayerControl, *components.Position, bool) {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
+			return &e.EcsWorld.PlayerControls[i], &e.EcsWorld.Positions[i], true
 		}
 	}
+	return nil, nil, false
+}
 
+func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
+	for j := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.HasPosition(j) && e.EcsWorld.IsInteractable(j) {
+			targetPos := e.EcsWorld.Positions[j]
+			dx := targetPos.X - pX
+			dy := targetPos.Y - pY
+			if (dx*dx + dy*dy) <= 2 {
+				return e.EcsWorld.Interactables[j].Prompt
+			}
+		}
+	}
+	return ""
+}
+
+func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool) {
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
 	if autopilotEngaged {
 		e.drawText(22, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
 	} else {
 		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
+}
 
+func (e *Engine) drawHUDMissionAndClock(hudY int) {
 	missionText := " MISSION: PROCEDURAL "
 	missionColor := core.Gray
 	if e.ActiveMission != nil {
@@ -722,37 +847,71 @@ func (e *Engine) renderHUD() {
 	e.drawText(2, hudY+2, missionText, missionColor)
 
 	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
-	clockX := e.Camera.Width - len(clockText) - 8
+	clockX := 100 - len(clockText) - 8
 	if clockX < 55 {
 		clockX = 55
 	}
 	e.drawText(clockX, hudY+1, clockText, core.Yellow)
+}
 
+func (e *Engine) drawHUDInteractionPrompt(hudY int, interactPrompt string) {
 	if interactPrompt != "" {
 		if e.tickCount%30 < 15 {
 			e.drawTextCentered(hudY-1, fmt.Sprintf("[ %s ]", interactPrompt), core.Green)
 		}
 	}
+}
 
+func (e *Engine) drawHUDMessages(hudY int) {
 	for i, msg := range e.Messages {
 		color := core.Green
-		if i == 0 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 3) }
-		if i == 1 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 1) }
+		if i == 0 && len(e.Messages) == 3 {
+			color = display.DarkenColor(core.Green, 3)
+		}
+		if i == 1 && len(e.Messages) == 3 {
+			color = display.DarkenColor(core.Green, 1)
+		}
 		e.drawText(2, hudY+3+i, "> "+msg, color)
 	}
+}
 
+func (e *Engine) drawHUDControls(hudY int) {
 	muteLabel := "[M] Mute"
 	controlsColor := core.Gray
 	if e.Audio.IsMuted() {
 		muteLabel = "[M] MUTED"
 		controlsColor = core.Red
 	}
-	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [ESC] Pause    [Q] Abort", muteLabel)
+	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [C] CRT Filter    [ESC] Pause    [Q] Abort", muteLabel)
 	e.drawText(2, hudY+7, controls, controlsColor)
 }
 
+func (e *Engine) renderHUD() {
+	hudY := 30
+	divider := strings.Repeat("═", 100)
+	e.drawText(0, hudY, divider, core.Gray)
+
+	ctrl, pos, found := e.getPlayerControlAndPosition()
+
+	statusText := "HEALTHY"
+	autopilotEngaged := false
+	var interactPrompt string
+
+	if found {
+		statusText = ctrl.Status.Title()
+		autopilotEngaged = ctrl.Autopilot
+		interactPrompt = e.getNearbyInteractionPrompt(pos.X, pos.Y)
+	}
+
+	e.drawHUDStatusAndNav(hudY, statusText, autopilotEngaged)
+	e.drawHUDMissionAndClock(hudY)
+	e.drawHUDInteractionPrompt(hudY, interactPrompt)
+	e.drawHUDMessages(hudY)
+	e.drawHUDControls(hudY)
+}
+
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
-	centerX := e.Camera.Width / 2
+	centerX := 50
 	halfText := len(text) / 2
 	x := centerX - halfText
 	e.Display.DrawText(x, y, text, color)
