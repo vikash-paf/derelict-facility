@@ -713,10 +713,18 @@ func (e *Engine) renderHUD() {
 		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
 	}
 
+	missionText := " MISSION: PROCEDURAL "
+	missionColor := core.Gray
+	if e.ActiveMission != nil {
+		missionText = fmt.Sprintf(" MISSION: %s ", e.ActiveMission.Title)
+		missionColor = core.Yellow
+	}
+	e.drawText(54, hudY+1, missionText, missionColor)
+
 	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
 	clockX := e.Camera.Width - len(clockText) - 8
-	if clockX < 55 {
-		clockX = 55
+	if clockX < 92 {
+		clockX = 92
 	}
 	e.drawText(clockX, hudY+1, clockText, core.Yellow)
 
