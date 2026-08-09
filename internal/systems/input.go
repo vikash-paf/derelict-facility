@@ -94,6 +94,135 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 	}
 }
 
+func interactWithGenerator(w *ecs.World, ent ecs.Entity, logFunc func(string), audioFunc func(string)) {
+	gen := &w.PowerGenerators[ent]
+	gen.IsActive = !gen.IsActive
+
+	// Update visual feedback and interaction prompt
+	if (w.Masks[ent] & components.MaskGlyph) != 0 {
+		glyph := &w.Glyphs[ent]
+		if gen.IsActive {
+			glyph.Color = core.Green
+			glyph.Char = "⚡"
+		} else {
+			glyph.Color = core.Red
+			glyph.Char = "X"
+		}
+	}
+	
+	if gen.IsActive {
+		w.Interactables[ent].Prompt = "Press [E] to Turn Off Generator"
+	} else {
+		w.Interactables[ent].Prompt = "Press [E] to Turn On Generator"
+	}
+
+	if audioFunc != nil {
+		audioFunc("generator_toggle")
+	}
+
+	if gen.IsActive {
+		logFunc("Power Generator turned on.")
+	} else {
+		logFunc("Power Generator turned off.")
+	}
+}
+
+func interactWithDoor(w *ecs.World, ent ecs.Entity, playerClearance uint32, logFunc func(string), audioFunc func(string)) {
+	door := &w.Doors[ent]
+
+	// Check security clearance
+	if door.RequiredClearance != 0 && (playerClearance&door.RequiredClearance) == 0 {
+		if audioFunc != nil {
+			audioFunc("access_denied")
+		}
+		logFunc("ACCESS DENIED: Required Clearance Missing.")
+		return
+	}
+
+	door.IsOpen = !door.IsOpen
+
+	if door.IsOpen {
+		w.RemoveSolid(ent)
+		w.Interactables[ent].Prompt = "Press [E] to Close Door"
+		if (w.Masks[ent] & components.MaskGlyph) != 0 {
+			w.Glyphs[ent].Char = "/"
+			w.Glyphs[ent].Color = core.Gray
+		}
+		if audioFunc != nil {
+			audioFunc("door_open")
+		}
+		logFunc("Door opened.")
+	} else {
+		w.AddSolid(ent)
+		w.Interactables[ent].Prompt = "Press [E] to Open Door"
+		if (w.Masks[ent] & components.MaskGlyph) != 0 {
+			w.Glyphs[ent].Char = "+"
+			w.Glyphs[ent].Color = core.White
+		}
+		if audioFunc != nil {
+			audioFunc("door_close")
+		}
+		logFunc("Door closed.")
+	}
+}
+
+func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, logFunc func(string), audioFunc func(string)) {
+	terminal := &w.Terminals[ent]
+
+	if audioFunc != nil {
+		audioFunc("terminal_access")
+	}
+
+	// Grant clearance if terminal has it
+	if terminal.GrantClearance != 0 && foundPlayer {
+		if (w.PlayerControls[playerEntID].SecurityClearance & terminal.GrantClearance) == 0 {
+			w.PlayerControls[playerEntID].SecurityClearance |= terminal.GrantClearance
+			logFunc("SECURITY CLEARANCE UPDATED.")
+		}
+	}
+
+	// If it has narrative data, display it
+	if (w.Masks[ent] & components.MaskNarrative) != 0 {
+		logFunc(w.Narratives[ent].Text)
+	}
+
+	if !terminal.HasSaved {
+		terminal.HasSaved = true
+		w.Interactables[ent].Prompt = "Press [E] to Access Terminal"
+		if (w.Masks[ent] & components.MaskGlyph) != 0 {
+			w.Glyphs[ent].Color = core.Green
+		}
+		saveState(w, gameMap)
+		logFunc("Checkpoint saved.")
+	}
+}
+
+func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+	stair := &w.Stairways[ent]
+	if stair.RequiredClearance != 0 && (playerClearance&stair.RequiredClearance) == 0 {
+		if audioFunc != nil {
+			audioFunc("access_denied")
+		}
+		logFunc("ELEVATOR LOCKED: Required Clearance Missing.")
+		return
+	}
+	if stair.TargetLevelID == "" {
+		logFunc("No connecting level found.")
+		return
+	}
+	if audioFunc != nil {
+		audioFunc("terminal_access")
+	}
+	dirLabel := "Descending"
+	if stair.IsUp {
+		dirLabel = "Ascending"
+	}
+	logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", dirLabel, stair.TargetLevelID))
+	if transitionFunc != nil {
+		transitionFunc(stair.TargetLevelID, stair.IsUp)
+	}
+}
+
 func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
@@ -121,138 +250,25 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 			if distSq <= 2 {
 				// 1. Power Generator
 				if (w.Masks[i] & components.MaskPowerGenerator) != 0 {
-					gen := &w.PowerGenerators[i]
-					gen.IsActive = !gen.IsActive
-
-					// Update visual feedback and interaction prompt
-					if (w.Masks[i] & components.MaskGlyph) != 0 {
-						glyph := &w.Glyphs[i]
-						if gen.IsActive {
-							glyph.Color = core.Green
-							glyph.Char = "⚡"
-						} else {
-							glyph.Color = core.Red
-							glyph.Char = "X"
-						}
-					}
-					
-					if gen.IsActive {
-						w.Interactables[i].Prompt = "Press [E] to Turn Off Generator"
-					} else {
-						w.Interactables[i].Prompt = "Press [E] to Turn On Generator"
-					}
-
-					if audioFunc != nil {
-						audioFunc("generator_toggle")
-					}
-
-					if gen.IsActive {
-						logFunc("Power Generator turned on.")
-					} else {
-						logFunc("Power Generator turned off.")
-					}
+					interactWithGenerator(w, i, logFunc, audioFunc)
 					return
 				}
 
 				// 2. Door
 				if (w.Masks[i] & components.MaskDoor) != 0 {
-					door := &w.Doors[i]
-
-					// Check security clearance
-					if door.RequiredClearance != 0 && (playerClearance&door.RequiredClearance) == 0 {
-						if audioFunc != nil {
-							audioFunc("access_denied")
-						}
-						logFunc("ACCESS DENIED: Required Clearance Missing.")
-						return
-					}
-
-					door.IsOpen = !door.IsOpen
-
-					if door.IsOpen {
-						w.RemoveSolid(i)
-						w.Interactables[i].Prompt = "Press [E] to Close Door"
-						if (w.Masks[i] & components.MaskGlyph) != 0 {
-							w.Glyphs[i].Char = "/"
-							w.Glyphs[i].Color = core.Gray
-						}
-						if audioFunc != nil {
-							audioFunc("door_open")
-						}
-						logFunc("Door opened.")
-					} else {
-						w.AddSolid(i)
-						w.Interactables[i].Prompt = "Press [E] to Open Door"
-						if (w.Masks[i] & components.MaskGlyph) != 0 {
-							w.Glyphs[i].Char = "+"
-							w.Glyphs[i].Color = core.White
-						}
-						if audioFunc != nil {
-							audioFunc("door_close")
-						}
-						logFunc("Door closed.")
-					}
+					interactWithDoor(w, i, playerClearance, logFunc, audioFunc)
 					return
 				}
 
 				// 3. Terminal
 				if (w.Masks[i] & components.MaskTerminal) != 0 {
-					terminal := &w.Terminals[i]
-
-					if audioFunc != nil {
-						audioFunc("terminal_access")
-					}
-
-					// Grant clearance if terminal has it
-					if terminal.GrantClearance != 0 && foundPlayer {
-						if (w.PlayerControls[playerEntID].SecurityClearance & terminal.GrantClearance) == 0 {
-							w.PlayerControls[playerEntID].SecurityClearance |= terminal.GrantClearance
-							logFunc("SECURITY CLEARANCE UPDATED.")
-						}
-					}
-
-					// If it has narrative data, display it
-					if (w.Masks[i] & components.MaskNarrative) != 0 {
-						logFunc(w.Narratives[i].Text)
-					}
-
-					if !terminal.HasSaved {
-						terminal.HasSaved = true
-						w.Interactables[i].Prompt = "Press [E] to Access Terminal"
-						if (w.Masks[i] & components.MaskGlyph) != 0 {
-							w.Glyphs[i].Color = core.Green
-						}
-						saveState(w, gameMap)
-						logFunc("Checkpoint saved.")
-					}
+					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, logFunc, audioFunc)
 					return
 				}
 
 				// 4. Stairway / Elevator Level Transition
 				if (w.Masks[i] & components.MaskStairway) != 0 {
-					stair := &w.Stairways[i]
-					if stair.RequiredClearance != 0 && (playerClearance&stair.RequiredClearance) == 0 {
-						if audioFunc != nil {
-							audioFunc("access_denied")
-						}
-						logFunc("ELEVATOR LOCKED: Required Clearance Missing.")
-						return
-					}
-					if stair.TargetLevelID == "" {
-						logFunc("No connecting level found.")
-						return
-					}
-					if audioFunc != nil {
-						audioFunc("terminal_access")
-					}
-					dirLabel := "Descending"
-					if stair.IsUp {
-						dirLabel = "Ascending"
-					}
-					logFunc(fmt.Sprintf("ELEVATOR: %s to %s...", dirLabel, stair.TargetLevelID))
-					if transitionFunc != nil {
-						transitionFunc(stair.TargetLevelID, stair.IsUp)
-					}
+					interactWithStairway(w, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
 				}
 			}
