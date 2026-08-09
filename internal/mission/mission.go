@@ -3,10 +3,15 @@ package mission
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
+	"os"
+	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/vikash-paf/derelict-facility/assets"
 )
+
+var missionTitleRegex = regexp.MustCompile(`^(?i)MISSION\s+\S+\s*:`)
 
 // LevelMeta describes a single level in a campaign mission.
 type LevelMeta struct {
@@ -23,9 +28,7 @@ type MissionManifest struct {
 	Synopsis   string      `json:"synopsis"`
 	StartLevel string      `json:"start_level"`
 	Levels     []LevelMeta `json:"levels"`
-
-	// Directory path where mission files reside (e.g. "missions/sector_4_incident")
-	Dir string `json:"-"`
+	Dir        string      `json:"-"`
 }
 
 // MissionLoader loads story campaign manifests from embedded or external files.
@@ -35,56 +38,100 @@ func NewMissionLoader() *MissionLoader {
 	return &MissionLoader{}
 }
 
-// DiscoverMissions scans embedded assets/missions for valid mission package manifests.
+// DiscoverMissions scans embedded assets/missions, local OS assets/missions, and local OS `./missions` directory, merging and indexing them correctly.
 func (l *MissionLoader) DiscoverMissions() ([]MissionManifest, error) {
-	var manifests []MissionManifest
+	manifests := make(map[string]MissionManifest)
 
+	l.discoverEmbedded(manifests)
+	l.discoverLocal("assets/missions", manifests)
+	l.discoverLocal("missions", manifests)
+
+	return l.sortAndIndexMissions(manifests), nil
+}
+
+func (l *MissionLoader) discoverEmbedded(manifests map[string]MissionManifest) {
 	entries, err := assets.AssetsFS.ReadDir("missions")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded missions directory: %w", err)
+		return
 	}
-
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-
 		dirName := entry.Name()
-		manifestPath := fmt.Sprintf("missions/%s/mission.json", dirName)
-
-		data, err := assets.AssetsFS.ReadFile(manifestPath)
-		if err != nil {
-			continue
+		manifest, err := loadManifest("missions", dirName, assets.AssetsFS.ReadFile)
+		if err == nil {
+			manifests[manifest.ID] = manifest
 		}
-
-		var m MissionManifest
-		if err := json.Unmarshal(data, &m); err != nil {
-			continue
-		}
-
-		m.Dir = fmt.Sprintf("missions/%s", dirName)
-		manifests = append(manifests, m)
 	}
+}
 
-	return manifests, nil
+func (l *MissionLoader) discoverLocal(dirPath string, manifests map[string]MissionManifest) {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dirName := entry.Name()
+		manifest, err := loadManifest(dirPath, dirName, os.ReadFile)
+		if err == nil {
+			manifests[manifest.ID] = manifest
+		}
+	}
+}
+
+func loadManifest(dirPath string, dirName string, readFunc func(string) ([]byte, error)) (MissionManifest, error) {
+	manifestPath := fmt.Sprintf("%s/%s/mission.json", dirPath, dirName)
+	data, err := readFunc(manifestPath)
+	if err != nil {
+		return MissionManifest{}, err
+	}
+	var manifest MissionManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return MissionManifest{}, err
+	}
+	manifest.Dir = fmt.Sprintf("%s/%s", dirPath, dirName)
+	return manifest, nil
+}
+
+func (l *MissionLoader) sortAndIndexMissions(manifests map[string]MissionManifest) []MissionManifest {
+	var ids []string
+	for id := range manifests {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	var ordered []MissionManifest
+	for i, id := range ids {
+		manifest := manifests[id]
+		manifest.Title = correctMissionTitle(manifest.Title, i+1)
+		ordered = append(ordered, manifest)
+	}
+	return ordered
+}
+
+func correctMissionTitle(title string, index int) string {
+	prefix := fmt.Sprintf("MISSION %d:", index)
+	if missionTitleRegex.MatchString(title) {
+		return missionTitleRegex.ReplaceAllString(title, prefix)
+	}
+	return title
 }
 
 // LoadLevelMapData retrieves the raw JSON byte data for a level map file inside a mission.
 func (m *MissionManifest) LoadLevelMapData(fileRelativePath string) ([]byte, error) {
 	fullPath := fmt.Sprintf("%s/%s", m.Dir, fileRelativePath)
 
-	// Try reading from embedded filesystem first
-	data, err := assets.AssetsFS.ReadFile(fullPath)
+	embedPath := fullPath
+	embedPath, _ = strings.CutPrefix(embedPath, "assets/")
+
+	data, err := assets.AssetsFS.ReadFile(embedPath)
 	if err == nil {
 		return data, nil
 	}
 
-	// Fallback: try direct OS filesystem read
-	return fs.ReadFile(osFS{}, fullPath)
-}
-
-type osFS struct{}
-
-func (osFS) Open(name string) (fs.File, error) {
-	return nil, fs.ErrNotExist
+	return os.ReadFile(fullPath)
 }

@@ -1,0 +1,12 @@
+{
+  "id": "protocol_9",
+  "title": "MISSION 2: PROTOCOL 9 LOCKDOWN",
+  "author": "Security Chief",
+  "synopsis": "The facility is under lockdown Protocol 9. Navigate the grid labyrinth to reach the upper Warden's Relay.",
+  "start_level": "p9_01",
+  "levels": [
+    { "id": "p9_01", "name": "Detention Grid Alpha", "file": "maps/p9_01.json" },
+    { "id": "p9_02", "name": "Administration Grid Beta", "file": "maps/p9_02.json" },
+    { "id": "p9_03", "name": "Warden's Spire Relay", "file": "maps/p9_03.json" }
+  ]
+}

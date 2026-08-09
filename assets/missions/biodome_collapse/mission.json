@@ -1,0 +1,12 @@
+{
+  "id": "biodome_collapse",
+  "title": "MISSION 1: THE BIO-DOME COLLAPSE",
+  "author": "Level Architect",
+  "synopsis": "The surface greenhouses have lost connection to the deep reactor. Descend and restore global power.",
+  "start_level": "bio_01",
+  "levels": [
+    { "id": "bio_01", "name": "Sunlit Greenhouse & Entry", "file": "maps/bio_01.json" },
+    { "id": "bio_02", "name": "Sub-Level Overgrowth Labs", "file": "maps/bio_02.json" },
+    { "id": "bio_03", "name": "Deep Reactor Core", "file": "maps/bio_03.json" }
+  ]
+}
