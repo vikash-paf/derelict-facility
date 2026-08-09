@@ -13,7 +13,7 @@ import (
 
 // IsSolidAt checks if any solid entity occupies the given coordinates.
 func IsSolidAt(w *ecs.World, x, y int) bool {
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if w.HasPosition(i) && w.IsSolid(i) {
 			pos := w.Positions[i]
 			if pos.X == x && pos.Y == y {
@@ -47,7 +47,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 		}
 	}
 
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if w.IsPlayer(i) && w.HasPosition(i) {
 			controls := &w.PlayerControls[i]
 			positions := &w.Positions[i]
@@ -235,7 +235,7 @@ func handleInteraction(
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
 	foundPlayer := false
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if world.IsPlayer(i) {
 			playerClearance = world.PlayerControls[i].SecurityClearance
 			playerEntID = i
@@ -244,7 +244,7 @@ func handleInteraction(
 		}
 	}
 
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if world.HasPosition(i) && world.IsInteractable(i) {
 			pos := world.Positions[i]
 			// Check adjacency
@@ -274,7 +274,7 @@ func handleInteraction(
 
 // IsPowerActive returns true if at least one global generator is active.
 func IsPowerActive(w *ecs.World) bool {
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if w.IsPowerGenerator(i) {
 			gen := w.PowerGenerators[i]
 			if gen.IsActive && gen.IsGlobal {
@@ -291,7 +291,7 @@ func IsPowerActiveAt(w *ecs.World, gameMap *world.Map, x, y int) bool {
 		return true
 	}
 
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if w.HasPosition(i) && w.IsPowerGenerator(i) {
 			gen := w.PowerGenerators[i]
 			if !gen.IsActive || gen.IsGlobal {

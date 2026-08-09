@@ -143,8 +143,8 @@ func (m *Map) castRay(x1, y1, x2, y2 int, blocksLight func(x, y int) bool) {
 // PropagateSunlight uses BFS to spill sunlight from glass roof tiles into nearby open floor tiles.
 func (m *Map) PropagateSunlight(maxSpillRadius int, isSolid func(x, y int) bool) {
 	type lightNode struct {
-		x, y  int
-		dist  int
+		x, y      int
+		dist      int
 		intensity float64
 	}
 

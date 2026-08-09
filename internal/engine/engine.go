@@ -498,14 +498,22 @@ func (e *Engine) getVisibleTileRange() (int, int, int, int) {
 	viewH := float32(viewportH) / e.Camera.Zoom
 
 	startX := int((e.Camera.Target.X - viewW/2) / cellWidthVal)
-	endX := int((e.Camera.Target.X + viewW/2) / cellWidthVal) + 1
+	endX := int((e.Camera.Target.X+viewW/2)/cellWidthVal) + 1
 	startY := int((e.Camera.Target.Y - viewH/2) / cellHeightVal)
-	endY := int((e.Camera.Target.Y + viewH/2) / cellHeightVal) + 1
+	endY := int((e.Camera.Target.Y+viewH/2)/cellHeightVal) + 1
 
-	if startX < 0 { startX = 0 }
-	if endX > e.Map.Width { endX = e.Map.Width }
-	if startY < 0 { startY = 0 }
-	if endY > e.Map.Height { endY = e.Map.Height }
+	if startX < 0 {
+		startX = 0
+	}
+	if endX > e.Map.Width {
+		endX = e.Map.Width
+	}
+	if startY < 0 {
+		startY = 0
+	}
+	if endY > e.Map.Height {
+		endY = e.Map.Height
+	}
 
 	return startX, endX, startY, endY
 }
@@ -551,7 +559,7 @@ func (e *Engine) clampCameraToMap(cellWidthVal, cellHeightVal float32) {
 
 	if mapW > viewW {
 		minX := viewW / 2
-		maxX := mapW - viewW / 2
+		maxX := mapW - viewW/2
 		if e.Camera.Target.X < minX {
 			e.Camera.Target.X = minX
 		} else if e.Camera.Target.X > maxX {
@@ -563,7 +571,7 @@ func (e *Engine) clampCameraToMap(cellWidthVal, cellHeightVal float32) {
 
 	if mapH > viewH {
 		minY := viewH / 2
-		maxY := mapH - viewH / 2
+		maxY := mapH - viewH/2
 		if e.Camera.Target.Y < minY {
 			e.Camera.Target.Y = minY
 		} else if e.Camera.Target.Y > maxY {
@@ -672,8 +680,12 @@ func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color 
 	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
 	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 	if !isTilePowered && !isSunlitByDay {
-		if tile.Distance > 3 { bgColor = display.DarkenColor(bgColor, 2) }
-		if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
+		if tile.Distance > 3 {
+			bgColor = display.DarkenColor(bgColor, 2)
+		}
+		if tile.Distance > 5 {
+			bgColor = display.DarkenColor(bgColor, 2)
+		}
 	}
 	return bgColor
 }
@@ -733,8 +745,12 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
 	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 	if !isTilePowered && !isSunlitByDay {
-		if tile.Distance > 3 { color = display.DarkenColor(color, 2) }
-		if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
+		if tile.Distance > 3 {
+			color = display.DarkenColor(color, 2)
+		}
+		if tile.Distance > 5 {
+			color = display.DarkenColor(color, 2)
+		}
 	}
 
 	e.Display.DrawText(x, y, char, color)
@@ -849,8 +865,12 @@ func (e *Engine) drawHUDInteractionPrompt(hudY int, interactPrompt string) {
 func (e *Engine) drawHUDMessages(hudY int) {
 	for i, msg := range e.Messages {
 		color := core.Green
-		if i == 0 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 3) }
-		if i == 1 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 1) }
+		if i == 0 && len(e.Messages) == 3 {
+			color = display.DarkenColor(core.Green, 3)
+		}
+		if i == 1 && len(e.Messages) == 3 {
+			color = display.DarkenColor(core.Green, 1)
+		}
 		e.drawText(2, hudY+3+i, "> "+msg, color)
 	}
 }

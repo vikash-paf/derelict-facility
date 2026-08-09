@@ -22,13 +22,13 @@ type RaylibDisplay struct {
 	Tileset        rl.Texture2D
 
 	// Virtual Framebuffer for Aspect-Ratio Correct Window Scaling
-	VirtualTarget  rl.RenderTexture2D
-	VirtualWidth   int32
-	VirtualHeight  int32
+	VirtualTarget rl.RenderTexture2D
+	VirtualWidth  int32
+	VirtualHeight int32
 
 	// CRT Retro Post-Processing Shader
-	Shader         rl.Shader
-	ShaderActive   bool
+	Shader       rl.Shader
+	ShaderActive bool
 }
 
 const crtShaderCode = `#version 330

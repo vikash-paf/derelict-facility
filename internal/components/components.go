@@ -114,4 +114,3 @@ type Terminal struct {
 	HasSaved       bool
 	GrantClearance uint32 // Bit to unlock in player's clearance mask
 }
-

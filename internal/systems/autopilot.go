@@ -12,7 +12,7 @@ import (
 
 // ProcessAutopilot handles AI pathing and automated door opening for PlayerControl entities.
 func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder, audioFunc func(string)) {
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if !w.IsPlayer(i) || !w.HasPosition(i) {
 			continue
 		}
@@ -106,7 +106,7 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 		return false
 	}
 
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if !w.HasPosition(i) || !w.IsSolid(i) {
 			continue
 		}
@@ -130,7 +130,7 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 
 // tryAutoOpenDoor automatically unlocks and opens closed doors when encountered on autopilot.
 func tryAutoOpenDoor(w *ecs.World, step entity.Point, clearance uint32, audioFunc func(string)) {
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	for i := range ecs.Entity(ecs.MaxEntities) {
 		if !w.HasPosition(i) || !w.IsDoor(i) {
 			continue
 		}

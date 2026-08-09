@@ -13,4 +13,3 @@ type ViewportBounds struct {
 	StartY int
 	EndY   int
 }
-
