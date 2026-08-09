@@ -239,9 +239,8 @@ func (e *Engine) activateMap(gameMap *world.Map, playerX, playerY int, manifest 
 
 // transferPlayerClearance copies clearance bits from a previous level into the current ECS world player.
 func (e *Engine) transferPlayerClearance(clearance uint32) {
-	targetMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
 			e.EcsWorld.PlayerControls[i].SecurityClearance = clearance
 			return
 		}
@@ -250,9 +249,8 @@ func (e *Engine) transferPlayerClearance(clearance uint32) {
 
 // playerClearance returns the current player's security clearance bitmask.
 func (e *Engine) playerClearance() uint32 {
-	targetMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
 			return e.EcsWorld.PlayerControls[i].SecurityClearance
 		}
 	}
@@ -462,9 +460,8 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	})
 
 	// Recalculate FOV based on current player position
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		targetMask := components.MaskPlayerControl | components.MaskPosition
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
 			pos := e.EcsWorld.Positions[i]
 			e.Map.ComputeFOV(pos.X, pos.Y, fovRadius, func(x, y int) bool {
 				if !e.Map.IsWalkable(x, y) {
@@ -517,9 +514,8 @@ func (e *Engine) updateAudioModulation() {
 	if e.EcsWorld == nil {
 		return
 	}
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
 			pos := e.EcsWorld.Positions[i]
 			isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, pos.X, pos.Y)
 			if isPowered {
@@ -539,9 +535,8 @@ func (e *Engine) getPlayerPosition() (components.Position, bool) {
 	if e.EcsWorld == nil {
 		return components.Position{}, false
 	}
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
 			return e.EcsWorld.Positions[i], true
 		}
 	}
@@ -654,9 +649,8 @@ func (e *Engine) renderPauseMenu() {
 
 func (e *Engine) populatePathLookup() {
 	clear(e.PathLookup)
-	targetMask := components.MaskPlayerControl
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
 			ctrl := e.EcsWorld.PlayerControls[i]
 			if ctrl.Autopilot {
 				for _, p := range ctrl.CurrentPath {
@@ -796,9 +790,8 @@ func (e *Engine) renderMapLayer(theme world.TileVariant, startX, endX, startY, e
 }
 
 func (e *Engine) getPlayerControlAndPosition() (*components.PlayerControl, *components.Position, bool) {
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) && e.EcsWorld.HasPosition(i) {
 			return &e.EcsWorld.PlayerControls[i], &e.EcsWorld.Positions[i], true
 		}
 	}
@@ -806,9 +799,8 @@ func (e *Engine) getPlayerControlAndPosition() (*components.PlayerControl, *comp
 }
 
 func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
-	interactMask := components.MaskPosition | components.MaskInteractable
-	for j := ecs.Entity(0); j < ecs.MaxEntities; j++ {
-		if (e.EcsWorld.Masks[j] & interactMask) == interactMask {
+	for j := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.HasPosition(j) && e.EcsWorld.IsInteractable(j) {
 			targetPos := e.EcsWorld.Positions[j]
 			dx := targetPos.X - pX
 			dy := targetPos.Y - pY
