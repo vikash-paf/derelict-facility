@@ -11,10 +11,10 @@ import (
 // RenderEntities loops through all entities possessing BOTH a Sprite or Glyph and Position component
 // and draws them to the active display buffer if they are within exactly visible map tiles and camera viewport.
 func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, bounds core.ViewportBounds) {
-	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+	renderEntity := func(i ecs.Entity) {
 		// Must have a position to be rendered
 		if (w.Masks[i] & components.MaskPosition) == 0 {
-			continue
+			return
 		}
 
 		hasSprite := (w.Masks[i] & components.MaskSprite) != 0
@@ -22,14 +22,14 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 
 		// Must have at least one visual representation
 		if !hasSprite && !hasGlyph {
-			continue
+			return
 		}
 
 		pos := w.Positions[i]
 
 		// Culling: Only render if within the camera's view
 		if pos.X < bounds.StartX || pos.X >= bounds.EndX || pos.Y < bounds.StartY || pos.Y >= bounds.EndY {
-			continue
+			return
 		}
 
 		// Is it the player? Check the mask for the PlayerControl bit
@@ -42,7 +42,7 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 		if !isPlayer && !isActiveGenerator {
 			tile := gameMap.GetTile(pos.X, pos.Y)
 			if tile == nil || !tile.Visible {
-				continue
+				return
 			}
 		}
 
@@ -52,6 +52,22 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 		} else if hasGlyph {
 			glyph := w.Glyphs[i]
 			disp.DrawText(pos.X, pos.Y, glyph.Char, glyph.Color)
+		}
+	}
+
+	// Pass 1: Render all non-player entities
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+		if !isPlayer {
+			renderEntity(i)
+		}
+	}
+
+	// Pass 2: Render all player entities
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+		if isPlayer {
+			renderEntity(i)
 		}
 	}
 }
