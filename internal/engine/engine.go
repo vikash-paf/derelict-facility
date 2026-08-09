@@ -719,12 +719,12 @@ func (e *Engine) renderHUD() {
 		missionText = fmt.Sprintf(" MISSION: %s ", e.ActiveMission.Title)
 		missionColor = core.Yellow
 	}
-	e.drawText(54, hudY+1, missionText, missionColor)
+	e.drawText(2, hudY+2, missionText, missionColor)
 
 	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
 	clockX := e.Camera.Width - len(clockText) - 8
-	if clockX < 92 {
-		clockX = 92
+	if clockX < 55 {
+		clockX = 55
 	}
 	e.drawText(clockX, hudY+1, clockText, core.Yellow)
 
@@ -738,7 +738,7 @@ func (e *Engine) renderHUD() {
 		color := core.Green
 		if i == 0 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 3) }
 		if i == 1 && len(e.Messages) == 3 { color = display.DarkenColor(core.Green, 1) }
-		e.drawText(2, hudY+2+i, "> "+msg, color)
+		e.drawText(2, hudY+3+i, "> "+msg, color)
 	}
 
 	muteLabel := "[M] Mute"

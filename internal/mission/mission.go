@@ -13,12 +13,14 @@ import (
 
 var missionTitleRegex = regexp.MustCompile(`^(?i)MISSION\s+\S+\s*:`)
 
+// LevelMeta describes a single level in a campaign mission.
 type LevelMeta struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	File string `json:"file"`
 }
 
+// MissionManifest defines the storyline metadata for a mission campaign package.
 type MissionManifest struct {
 	ID         string      `json:"id"`
 	Title      string      `json:"title"`
@@ -29,12 +31,14 @@ type MissionManifest struct {
 	Dir        string      `json:"-"`
 }
 
+// MissionLoader loads story campaign manifests from embedded or external files.
 type MissionLoader struct{}
 
 func NewMissionLoader() *MissionLoader {
 	return &MissionLoader{}
 }
 
+// DiscoverMissions scans embedded assets/missions, local OS assets/missions, and local OS `./missions` directory, merging and indexing them correctly.
 func (l *MissionLoader) DiscoverMissions() ([]MissionManifest, error) {
 	manifests := make(map[string]MissionManifest)
 
@@ -117,6 +121,7 @@ func correctMissionTitle(title string, index int) string {
 	return title
 }
 
+// LoadLevelMapData retrieves the raw JSON byte data for a level map file inside a mission.
 func (m *MissionManifest) LoadLevelMapData(fileRelativePath string) ([]byte, error) {
 	fullPath := fmt.Sprintf("%s/%s", m.Dir, fileRelativePath)
 
