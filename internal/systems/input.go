@@ -7,6 +7,7 @@ import (
 	"github.com/vikash-paf/derelict-facility/internal/components"
 	"github.com/vikash-paf/derelict-facility/internal/core"
 	"github.com/vikash-paf/derelict-facility/internal/ecs"
+	"github.com/vikash-paf/derelict-facility/internal/mission"
 	"github.com/vikash-paf/derelict-facility/internal/world"
 )
 
@@ -25,7 +26,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -61,7 +62,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y, gameMap, logFunc, audioFunc, transitionFunc)
+				handleInteraction(w, positions.X, positions.Y, gameMap, activeMission, activeLevelID, logFunc, audioFunc, transitionFunc)
 			}
 
 			// Disable autopilot if manual movement keys are pressed
@@ -166,7 +167,7 @@ func interactWithDoor(w *ecs.World, ent ecs.Entity, playerClearance uint32, logF
 	}
 }
 
-func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, logFunc func(string), audioFunc func(string)) {
+func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string)) {
 	terminal := &w.Terminals[ent]
 
 	if audioFunc != nil {
@@ -192,7 +193,7 @@ func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, 
 		if (w.Masks[ent] & components.MaskGlyph) != 0 {
 			w.Glyphs[ent].Color = core.Green
 		}
-		saveState(w, gameMap)
+		saveState(w, gameMap, activeMission, activeLevelID)
 		logFunc("Checkpoint saved.")
 	}
 }
@@ -223,7 +224,7 @@ func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, 
 	}
 }
 
-func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
@@ -262,7 +263,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 
 				// 3. Terminal
 				if (w.Masks[i] & components.MaskTerminal) != 0 {
-					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, logFunc, audioFunc)
+					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
 					return
 				}
 

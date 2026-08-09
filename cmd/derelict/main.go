@@ -52,6 +52,8 @@ func main() {
 
 	// If loaded from savegame, skip main menu directly into gameplay
 	if saveData != nil {
+		gameEngine.ActiveMission = saveData.ActiveMission
+		gameEngine.ActiveLevelID = saveData.ActiveLevelID
 		gameEngine.State = engine.GameStateRunning
 	}
 

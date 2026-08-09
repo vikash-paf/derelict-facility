@@ -430,7 +430,7 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	clearanceBefore := e.playerClearance()
 
 	// Let the systems tick using the events we polled at the start of the frame!
-	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, func(msg string) {
+	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, e.ActiveMission, e.ActiveLevelID, func(msg string) {
 		// If the new message is the same as the last one, don't repeat it
 		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
 			return
