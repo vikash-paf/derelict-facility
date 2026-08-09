@@ -95,7 +95,7 @@ func (r *RaylibDisplay) Init(gridWidth, gridHeight int, title string) error {
 	// Load CRT post-processing shader
 	r.Shader = rl.LoadShaderFromMemory("", crtShaderCode)
 	if r.Shader.ID != 0 {
-		r.ShaderActive = true
+		r.ShaderActive = false // Disabled by default; toggle on/off with [C] key
 	}
 
 	if r.FontPath != "" {
