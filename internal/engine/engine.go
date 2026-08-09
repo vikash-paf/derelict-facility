@@ -670,18 +670,30 @@ func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.Ti
 	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 	if char == "╬" || char == "#" || char == "█" || char == "▓" {
 		switch tile.Bitmask {
-		case 0: char = "O"
-		case 1, 4, 5: char = "║"
-		case 2, 8, 10: char = "═"
-		case 3: char = "╚"
-		case 6: char = "╔"
-		case 12: char = "╗"
-		case 9: char = "╝"
-		case 7: char = "╠"
-		case 14: char = "╦"
-		case 13: char = "╣"
-		case 11: char = "╩"
-		case 15: char = "╬"
+		case world.WallBitmaskIsolated:
+			char = "O"
+		case world.WallBitmaskNorthOnly, world.WallBitmaskSouthOnly, world.WallBitmaskNorthSouth:
+			char = "║"
+		case world.WallBitmaskEastOnly, world.WallBitmaskWestOnly, world.WallBitmaskEastWest:
+			char = "═"
+		case world.WallBitmaskNorthEast:
+			char = "╚"
+		case world.WallBitmaskEastSouth:
+			char = "╔"
+		case world.WallBitmaskSouthWest:
+			char = "╗"
+		case world.WallBitmaskWestNorth:
+			char = "╝"
+		case world.WallBitmaskNorthEastSouth:
+			char = "╠"
+		case world.WallBitmaskEastSouthWest:
+			char = "╦"
+		case world.WallBitmaskSouthWestNorth:
+			char = "╣"
+		case world.WallBitmaskWestNorthEast:
+			char = "╩"
+		case world.WallBitmaskIntersection:
+			char = "╬"
 		}
 	}
 
