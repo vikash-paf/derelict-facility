@@ -3,10 +3,15 @@ package mission
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
+	"os"
+	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/vikash-paf/derelict-facility/assets"
 )
+
+var missionTitleRegex = regexp.MustCompile(`^(?i)MISSION\s+\S+\s*:`)
 
 // LevelMeta describes a single level in a campaign mission.
 type LevelMeta struct {
@@ -35,38 +40,85 @@ func NewMissionLoader() *MissionLoader {
 	return &MissionLoader{}
 }
 
-// DiscoverMissions scans embedded assets/missions for valid mission package manifests.
+// DiscoverMissions scans embedded assets/missions and local OS filesystem assets/missions, merging and indexing them correctly.
 func (l *MissionLoader) DiscoverMissions() ([]MissionManifest, error) {
-	var manifests []MissionManifest
+	manifestMap := make(map[string]MissionManifest)
 
-	entries, err := assets.AssetsFS.ReadDir("missions")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded missions directory: %w", err)
+	// 1. Scan embedded assets first
+	if entries, err := assets.AssetsFS.ReadDir("missions"); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			dirName := entry.Name()
+			manifestPath := fmt.Sprintf("missions/%s/mission.json", dirName)
+
+			data, err := assets.AssetsFS.ReadFile(manifestPath)
+			if err != nil {
+				continue
+			}
+
+			var m MissionManifest
+			if err := json.Unmarshal(data, &m); err != nil {
+				continue
+			}
+
+			m.Dir = fmt.Sprintf("missions/%s", dirName)
+			manifestMap[m.ID] = m
+		}
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	// 2. Scan local OS assets/missions directory (useful for non-compiled / live dev mode)
+	if entries, err := os.ReadDir("assets/missions"); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			dirName := entry.Name()
+			manifestPath := fmt.Sprintf("assets/missions/%s/mission.json", dirName)
+
+			data, err := os.ReadFile(manifestPath)
+			if err != nil {
+				continue
+			}
+
+			var m MissionManifest
+			if err := json.Unmarshal(data, &m); err != nil {
+				continue
+			}
+
+			m.Dir = fmt.Sprintf("missions/%s", dirName)
+			manifestMap[m.ID] = m
 		}
+	}
 
-		dirName := entry.Name()
-		manifestPath := fmt.Sprintf("missions/%s/mission.json", dirName)
+	// Convert map to slice and sort by ID/name to make it stable
+	var keys []string
+	for k := range manifestMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 
-		data, err := assets.AssetsFS.ReadFile(manifestPath)
-		if err != nil {
-			continue
-		}
-
-		var m MissionManifest
-		if err := json.Unmarshal(data, &m); err != nil {
-			continue
-		}
-
-		m.Dir = fmt.Sprintf("missions/%s", dirName)
+	var manifests []MissionManifest
+	for i, k := range keys {
+		m := manifestMap[k]
+		// Dynamically correct the "MISSION X:" prefix to reflect the 1-based sorted index
+		m.Title = correctMissionTitle(m.Title, i+1)
 		manifests = append(manifests, m)
 	}
 
 	return manifests, nil
+}
+
+// correctMissionTitle replaces any existing "MISSION X:" prefix with "MISSION [index]:"
+func correctMissionTitle(title string, index int) string {
+	prefix := fmt.Sprintf("MISSION %d:", index)
+	if missionTitleRegex.MatchString(title) {
+		return missionTitleRegex.ReplaceAllString(title, prefix)
+	}
+	return title
 }
 
 // LoadLevelMapData retrieves the raw JSON byte data for a level map file inside a mission.
@@ -79,12 +131,10 @@ func (m *MissionManifest) LoadLevelMapData(fileRelativePath string) ([]byte, err
 		return data, nil
 	}
 
-	// Fallback: try direct OS filesystem read
-	return fs.ReadFile(osFS{}, fullPath)
-}
-
-type osFS struct{}
-
-func (osFS) Open(name string) (fs.File, error) {
-	return nil, fs.ErrNotExist
+	// Fallback: try direct OS filesystem read. Prepend "assets/" if not present.
+	osPath := fullPath
+	if !strings.HasPrefix(osPath, "assets/") {
+		osPath = "assets/" + osPath
+	}
+	return os.ReadFile(osPath)
 }
