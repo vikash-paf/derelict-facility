@@ -287,7 +287,7 @@ func spawnGenerators(w *ecs.World, gameMap *world.Map) {
 		w.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
 		w.AddGlyph(genEnt, components.Glyph{Char: "X", Color: core.Red})
 		w.AddSolid(genEnt)
-		w.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Toggle Generator"})
+		w.AddInteractable(genEnt, components.Interactable{Prompt: "Press [E] to Turn On Generator"})
 		w.AddPowerGenerator(genEnt, components.PowerGenerator{
 			IsActive: false,
 			IsGlobal: genInfo.IsGlobal,

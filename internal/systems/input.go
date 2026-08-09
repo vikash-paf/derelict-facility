@@ -124,7 +124,7 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 					gen := &w.PowerGenerators[i]
 					gen.IsActive = !gen.IsActive
 
-					// Update visual feedback
+					// Update visual feedback and interaction prompt
 					if (w.Masks[i] & components.MaskGlyph) != 0 {
 						glyph := &w.Glyphs[i]
 						if gen.IsActive {
@@ -135,10 +135,22 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, l
 							glyph.Char = "X"
 						}
 					}
+					
+					if gen.IsActive {
+						w.Interactables[i].Prompt = "Press [E] to Turn Off Generator"
+					} else {
+						w.Interactables[i].Prompt = "Press [E] to Turn On Generator"
+					}
+
 					if audioFunc != nil {
 						audioFunc("generator_toggle")
 					}
-					logFunc("Power Generator toggled.")
+
+					if gen.IsActive {
+						logFunc("Power Generator turned on.")
+					} else {
+						logFunc("Power Generator turned off.")
+					}
 					return
 				}
 
