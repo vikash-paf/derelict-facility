@@ -55,7 +55,7 @@ type Engine struct {
 	PathLookup    []bool // Pre-allocated array to avoid map allocations per frame
 	Pathfinder    *world.Pathfinder
 	Messages      []string
-	Camera        *core.Camera
+	Camera        rl.Camera2D
 	ActiveMission *mission.MissionManifest // nil if using procedural map
 	ActiveLevelID string                   // current level ID within the mission
 }
@@ -81,11 +81,9 @@ func NewEngine(
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
 		Clock:      world.NewFacilityClock(),
-		Camera: &core.Camera{
-			X:      0,
-			Y:      0,
-			Width:  viewWidth,
-			Height: viewHeight,
+		Camera: rl.Camera2D{
+			Zoom:   1.0,
+			Offset: rl.NewVector2(500, 300), // center of 1000x600 viewport
 		},
 	}
 
@@ -108,6 +106,9 @@ func (e *Engine) Run() error {
 
 		events := e.Display.PollInput()
 		e.handleInputForGlobals(events)
+
+		// Update audio stream (music playback)
+		e.Audio.Update()
 
 		if e.State == GameStateMainMenu {
 			e.handleMainMenuInput(events)
@@ -374,31 +375,30 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 			e.State = e.State.Flip()
 		}
 		if event.Key == rl.KeyEqual { // '+' key to Zoom In
-			currentScale := e.Display.GetScale()
-			e.Display.SetScale(currentScale + 0.25)
-			e.recalculateViewport()
+			e.Camera.Zoom += 0.25
+			if e.Camera.Zoom > 3.0 {
+				e.Camera.Zoom = 3.0
+			}
+			e.updateCamera()
 		}
 		if event.Key == rl.KeyMinus { // '-' key to Zoom Out
-			currentScale := e.Display.GetScale()
-			e.Display.SetScale(currentScale - 0.25)
-			e.recalculateViewport()
+			e.Camera.Zoom -= 0.25
+			if e.Camera.Zoom < 0.5 {
+				e.Camera.Zoom = 0.5
+			}
+			e.updateCamera()
 		}
 		if event.Key == rl.KeyM {
 			e.Audio.ToggleMute()
+		}
+		if event.Key == rl.KeyC {
+			e.Display.ToggleShader()
 		}
 	}
 }
 
 func (e *Engine) recalculateViewport() {
-	gw, gh := e.Display.GetDimensions()
-	hudHeight := 8
-	if gh > hudHeight {
-		e.Camera.Width = gw
-		e.Camera.Height = gh - hudHeight
-	} else {
-		e.Camera.Width = gw
-		e.Camera.Height = gh
-	}
+	// No-op: Virtual resolution rendering handles scaling automatically.
 }
 
 func (e *Engine) Update(events []core.InputEvent) {
@@ -479,23 +479,93 @@ func (e *Engine) Resume() {
 	e.State = GameStateRunning
 }
 
+func (e *Engine) getVisibleTileRange() (int, int, int, int) {
+	if e.Map == nil {
+		return 0, 0, 0, 0
+	}
+	cellWidth := float32(10)
+	cellHeight := float32(20)
+	viewW := float32(1000) / e.Camera.Zoom
+	viewH := float32(600) / e.Camera.Zoom
+
+	startX := int((e.Camera.Target.X - viewW/2) / cellWidth)
+	endX := int((e.Camera.Target.X + viewW/2) / cellWidth) + 1
+	startY := int((e.Camera.Target.Y - viewH/2) / cellHeight)
+	endY := int((e.Camera.Target.Y + viewH/2) / cellHeight) + 1
+
+	if startX < 0 { startX = 0 }
+	if endX > e.Map.Width { endX = e.Map.Width }
+	if startY < 0 { startY = 0 }
+	if endY > e.Map.Height { endY = e.Map.Height }
+
+	return startX, endX, startY, endY
+}
+
+func (e *Engine) updateAudioModulation() {
+	targetMask := components.MaskPlayerControl | components.MaskPosition
+	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
+		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
+			pos := e.EcsWorld.Positions[i]
+			isPowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, pos.X, pos.Y)
+			if isPowered {
+				e.Audio.SetMusicVolume(0.4)
+				e.Audio.SetMusicPitch(1.0)
+			} else {
+				// Eerie unpowered room effect: lower volume, lower pitch
+				e.Audio.SetMusicVolume(0.18)
+				e.Audio.SetMusicPitch(0.82)
+			}
+			break
+		}
+	}
+}
+
 func (e *Engine) updateCamera() {
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
 			pos := e.EcsWorld.Positions[i]
-			newX := pos.X - e.Camera.Width/2
-			newY := pos.Y - e.Camera.Height/2
+			cellWidth := float32(10)
+			cellHeight := float32(20)
 
-			if newX < 0 {
-				newX = 0
-			}
-			if newY < 0 {
-				newY = 0
-			}
+			// Player position in pixels (center of player tile)
+			playerPx := float32(pos.X)*cellWidth + cellWidth/2
+			playerPy := float32(pos.Y)*cellHeight + cellHeight/2
 
-			e.Camera.X = newX
-			e.Camera.Y = newY
+			e.Camera.Target = rl.NewVector2(playerPx, playerPy)
+			e.Camera.Offset = rl.NewVector2(500, 300) // Center of 1000x600 viewport
+
+			// Clamp to map boundaries if map exists
+			if e.Map != nil {
+				mapW := float32(e.Map.Width) * cellWidth
+				mapH := float32(e.Map.Height) * cellHeight
+				viewW := float32(1000) / e.Camera.Zoom
+				viewH := float32(600) / e.Camera.Zoom
+
+				if mapW > viewW {
+					minX := viewW / 2
+					maxX := mapW - viewW / 2
+					if e.Camera.Target.X < minX {
+						e.Camera.Target.X = minX
+					} else if e.Camera.Target.X > maxX {
+						e.Camera.Target.X = maxX
+					}
+				} else {
+					e.Camera.Target.X = mapW / 2
+				}
+
+				if mapH > viewH {
+					minY := viewH / 2
+					maxY := mapH - viewH / 2
+					if e.Camera.Target.Y < minY {
+						e.Camera.Target.Y = minY
+					} else if e.Camera.Target.Y > maxY {
+						e.Camera.Target.Y = maxY
+					}
+				} else {
+					e.Camera.Target.Y = mapH / 2
+				}
+			}
 			break
 		}
 	}
@@ -507,7 +577,7 @@ func (e *Engine) render() {
 	e.Display.BeginFrame()
 
 	if e.State == GameStateMainMenu {
-		e.Menu.Render(e.Display, e.Camera.Width, e.Camera.Height+8)
+		e.Menu.Render(e.Display, 100, 38)
 		e.Display.EndFrame()
 		return
 	}
@@ -522,8 +592,19 @@ func (e *Engine) render() {
 	}
 
 	if e.Map != nil && e.EcsWorld != nil {
-		e.renderMapLayer(activeTheme)
-		systems.RenderEntities(e.EcsWorld, e.Display, e.Map, e.Camera)
+		startX, endX, startY, endY := e.getVisibleTileRange()
+		bounds := core.ViewportBounds{
+			StartX: startX,
+			EndX:   endX,
+			StartY: startY,
+			EndY:   endY,
+		}
+
+		rl.BeginMode2D(e.Camera)
+		e.renderMapLayer(activeTheme, startX, endX, startY, endY)
+		systems.RenderEntities(e.EcsWorld, e.Display, e.Map, bounds)
+		rl.EndMode2D()
+
 		e.renderHUD()
 	}
 
@@ -542,7 +623,7 @@ func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
 }
 
-func (e *Engine) renderMapLayer(theme world.TileVariant) {
+func (e *Engine) renderMapLayer(theme world.TileVariant, startX, endX, startY, endY int) {
 	clear(e.PathLookup)
 
 	// Collect paths from all PlayerControl entities to draw the red autopilot line
@@ -558,21 +639,18 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 		}
 	}
 
-	// Iterate over viewport bounds ONLY
-	for y := e.Camera.Y; y < e.Camera.Y+e.Camera.Height; y++ {
-		for x := e.Camera.X; x < e.Camera.X+e.Camera.Width; x++ {
+	// Iterate over visible viewport bounds only
+	for y := startY; y < endY; y++ {
+		for x := startX; x < endX; x++ {
 			tile := e.Map.GetTile(x, y)
 			if tile == nil {
 				continue
 			}
 
-			// Translate world X,Y to screen coordinates
-			screenX, screenY := e.Camera.WorldToScreen(x, y)
-
 			// 1. Draw Autopilot Path
 			isPathTile := e.PathLookup[y*e.Map.Width+x]
 			if isPathTile && (tile.Visible || tile.Explored) {
-				e.Display.DrawText(screenX, screenY, "*", core.Red)
+				e.Display.DrawText(x, y, "*", core.Red)
 				continue
 			}
 
@@ -600,7 +678,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 						if tile.Distance > 5 { bgColor = display.DarkenColor(bgColor, 2) }
 					}
 
-					e.Display.DrawRect(screenX, screenY, bgColor)
+					e.Display.DrawRect(x, y, bgColor)
 					continue
 				}
 
@@ -636,13 +714,13 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					if tile.Distance > 5 { color = display.DarkenColor(color, 2) }
 				}
 
-				e.Display.DrawText(screenX, screenY, char, color)
+				e.Display.DrawText(x, y, char, color)
 				continue
 			}
 
 			if tile.Explored {
 				if tile.Type == world.TileTypeFloor {
-					e.Display.DrawRect(screenX, screenY, core.Color{R: 8, G: 8, B: 12, A: 255})
+					e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
 					continue
 				}
 				char, color := theme[tile.Type].Char, theme[tile.Type].Color
@@ -665,7 +743,7 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 					}
 				}
 				dimColor := display.DarkenColor(color, 4)
-				e.Display.DrawText(screenX, screenY, char, dimColor)
+				e.Display.DrawText(x, y, char, dimColor)
 				continue
 			}
 		}
@@ -673,8 +751,8 @@ func (e *Engine) renderMapLayer(theme world.TileVariant) {
 }
 
 func (e *Engine) renderHUD() {
-	hudY := e.Camera.Height
-	divider := strings.Repeat("═", e.Camera.Width)
+	hudY := 30
+	divider := strings.Repeat("═", 100)
 	e.drawText(0, hudY, divider, core.Gray)
 
 	statusText := "HEALTHY"
@@ -722,7 +800,7 @@ func (e *Engine) renderHUD() {
 	e.drawText(2, hudY+2, missionText, missionColor)
 
 	clockText := fmt.Sprintf(" TIME: %s ", e.Clock.FormatTime())
-	clockX := e.Camera.Width - len(clockText) - 8
+	clockX := 100 - len(clockText) - 8
 	if clockX < 55 {
 		clockX = 55
 	}
@@ -747,12 +825,12 @@ func (e *Engine) renderHUD() {
 		muteLabel = "[M] MUTED"
 		controlsColor = core.Red
 	}
-	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [ESC] Pause    [Q] Abort", muteLabel)
+	controls := fmt.Sprintf(" [W/A/S/D] Move    [P] Autopilot    [+/-] Zoom    %s    [C] CRT Filter    [ESC] Pause    [Q] Abort", muteLabel)
 	e.drawText(2, hudY+7, controls, controlsColor)
 }
 
 func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
-	centerX := e.Camera.Width / 2
+	centerX := 50
 	halfText := len(text) / 2
 	x := centerX - halfText
 	e.Display.DrawText(x, y, text, color)

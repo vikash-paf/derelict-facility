@@ -19,4 +19,5 @@ type Display interface {
 	IsResized() bool
 	SetScale(scale float32)
 	GetScale() float32
+	ToggleShader()
 }
