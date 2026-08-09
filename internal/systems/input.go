@@ -13,9 +13,8 @@ import (
 
 // IsSolidAt checks if any solid entity occupies the given coordinates.
 func IsSolidAt(w *ecs.World, x, y int) bool {
-	targetMask := components.MaskPosition | components.MaskSolid
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+		if w.HasPosition(i) && w.IsSolid(i) {
 			pos := w.Positions[i]
 			if pos.X == x && pos.Y == y {
 				return true
@@ -48,10 +47,8 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 		}
 	}
 
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+		if w.IsPlayer(i) && w.HasPosition(i) {
 			controls := &w.PlayerControls[i]
 			positions := &w.Positions[i]
 
@@ -229,9 +226,8 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, a
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
 	foundPlayer := false
-	playerMask := components.MaskPlayerControl
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & playerMask) == playerMask {
+		if w.IsPlayer(i) {
 			playerClearance = w.PlayerControls[i].SecurityClearance
 			playerEntID = i
 			foundPlayer = true
@@ -239,9 +235,8 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, a
 		}
 	}
 
-	targetMask := components.MaskPosition | components.MaskInteractable
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+		if w.HasPosition(i) && w.IsInteractable(i) {
 			pos := w.Positions[i]
 			// Check adjacency
 			dx := pos.X - playerX
@@ -249,26 +244,17 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, a
 			distSq := dx*dx + dy*dy
 
 			if distSq <= 2 {
-				// 1. Power Generator
-				if (w.Masks[i] & components.MaskPowerGenerator) != 0 {
+				switch {
+				case w.IsPowerGenerator(i):
 					interactWithGenerator(w, i, logFunc, audioFunc)
 					return
-				}
-
-				// 2. Door
-				if (w.Masks[i] & components.MaskDoor) != 0 {
+				case w.IsDoor(i):
 					interactWithDoor(w, i, playerClearance, logFunc, audioFunc)
 					return
-				}
-
-				// 3. Terminal
-				if (w.Masks[i] & components.MaskTerminal) != 0 {
+				case w.IsTerminal(i):
 					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
 					return
-				}
-
-				// 4. Stairway / Elevator Level Transition
-				if (w.Masks[i] & components.MaskStairway) != 0 {
+				case w.IsStairway(i):
 					interactWithStairway(w, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
 				}
@@ -279,9 +265,8 @@ func handleInteraction(w *ecs.World, playerX, playerY int, gameMap *world.Map, a
 
 // IsPowerActive returns true if at least one global generator is active.
 func IsPowerActive(w *ecs.World) bool {
-	targetMask := components.MaskPowerGenerator
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+		if w.IsPowerGenerator(i) {
 			gen := w.PowerGenerators[i]
 			if gen.IsActive && gen.IsGlobal {
 				return true
@@ -297,9 +282,8 @@ func IsPowerActiveAt(w *ecs.World, gameMap *world.Map, x, y int) bool {
 		return true
 	}
 
-	targetMask := components.MaskPosition | components.MaskPowerGenerator
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) == targetMask {
+		if w.HasPosition(i) && w.IsPowerGenerator(i) {
 			gen := w.PowerGenerators[i]
 			if !gen.IsActive || gen.IsGlobal {
 				continue

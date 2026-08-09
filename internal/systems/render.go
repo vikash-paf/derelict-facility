@@ -33,7 +33,7 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 		}
 
 		// Is it the player? Check the mask for the PlayerControl bit
-		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+		isPlayer := w.IsPlayer(i)
 
 		// Check if it's an active generator
 		isGenerator := (w.Masks[i] & components.MaskPowerGenerator) != 0
@@ -57,7 +57,7 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 
 	// Pass 1: Render all non-player entities
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+		isPlayer := w.IsPlayer(i)
 		if !isPlayer {
 			renderEntity(i)
 		}
@@ -65,7 +65,7 @@ func RenderEntities(w *ecs.World, disp display.Display, gameMap *world.Map, boun
 
 	// Pass 2: Render all player entities
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		isPlayer := (w.Masks[i] & components.MaskPlayerControl) != 0
+		isPlayer := w.IsPlayer(i)
 		if isPlayer {
 			renderEntity(i)
 		}

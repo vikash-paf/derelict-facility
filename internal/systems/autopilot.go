@@ -12,10 +12,8 @@ import (
 
 // ProcessAutopilot handles AI pathing and automated door opening for PlayerControl entities.
 func ProcessAutopilot(w *ecs.World, gameMap *world.Map, pf *world.Pathfinder, audioFunc func(string)) {
-	targetMask := components.MaskPlayerControl | components.MaskPosition
-
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & targetMask) != targetMask {
+		if !w.IsPlayer(i) || !w.HasPosition(i) {
 			continue
 		}
 
@@ -108,12 +106,8 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 		return false
 	}
 
-	doorMask := components.MaskPosition | components.MaskDoor
-	solidMask := components.MaskPosition | components.MaskSolid
-
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		mask := w.Masks[i]
-		if (mask & solidMask) != solidMask {
+		if !w.HasPosition(i) || !w.IsSolid(i) {
 			continue
 		}
 
@@ -123,7 +117,7 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 		}
 
 		// If solid entity is a door, check if player has clearance to unlock it
-		if (mask & doorMask) == doorMask {
+		if w.IsDoor(i) {
 			door := w.Doors[i]
 			return door.RequiredClearance == 0 || (clearance&door.RequiredClearance) != 0
 		}
@@ -136,10 +130,8 @@ func isTileTraversable(w *ecs.World, gameMap *world.Map, x, y int, clearance uin
 
 // tryAutoOpenDoor automatically unlocks and opens closed doors when encountered on autopilot.
 func tryAutoOpenDoor(w *ecs.World, step entity.Point, clearance uint32, audioFunc func(string)) {
-	doorMask := components.MaskPosition | components.MaskDoor
-
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
-		if (w.Masks[i] & doorMask) != doorMask {
+		if !w.HasPosition(i) || !w.IsDoor(i) {
 			continue
 		}
 
