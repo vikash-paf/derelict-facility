@@ -40,7 +40,7 @@ func NewMissionLoader() *MissionLoader {
 	return &MissionLoader{}
 }
 
-// DiscoverMissions scans embedded assets/missions and local OS filesystem assets/missions, merging and indexing them correctly.
+// DiscoverMissions scans embedded assets/missions, local OS assets/missions, and local OS `./missions` directory, merging and indexing them correctly.
 func (l *MissionLoader) DiscoverMissions() ([]MissionManifest, error) {
 	manifestMap := make(map[string]MissionManifest)
 
@@ -89,6 +89,31 @@ func (l *MissionLoader) DiscoverMissions() ([]MissionManifest, error) {
 				continue
 			}
 
+			m.Dir = fmt.Sprintf("assets/missions/%s", dirName)
+			manifestMap[m.ID] = m
+		}
+	}
+
+	// 3. Scan local OS ./missions directory (parallel to the binary file)
+	if entries, err := os.ReadDir("missions"); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			dirName := entry.Name()
+			manifestPath := fmt.Sprintf("missions/%s/mission.json", dirName)
+
+			data, err := os.ReadFile(manifestPath)
+			if err != nil {
+				continue
+			}
+
+			var m MissionManifest
+			if err := json.Unmarshal(data, &m); err != nil {
+				continue
+			}
+
 			m.Dir = fmt.Sprintf("missions/%s", dirName)
 			manifestMap[m.ID] = m
 		}
@@ -125,16 +150,16 @@ func correctMissionTitle(title string, index int) string {
 func (m *MissionManifest) LoadLevelMapData(fileRelativePath string) ([]byte, error) {
 	fullPath := fmt.Sprintf("%s/%s", m.Dir, fileRelativePath)
 
-	// Try reading from embedded filesystem first
-	data, err := assets.AssetsFS.ReadFile(fullPath)
+	// Try reading from embedded filesystem. Embedded paths look like "missions/[dirName]/[file]"
+	embedPath := fullPath
+	if strings.HasPrefix(embedPath, "assets/") {
+		embedPath = strings.TrimPrefix(embedPath, "assets/")
+	}
+	data, err := assets.AssetsFS.ReadFile(embedPath)
 	if err == nil {
 		return data, nil
 	}
 
-	// Fallback: try direct OS filesystem read. Prepend "assets/" if not present.
-	osPath := fullPath
-	if !strings.HasPrefix(osPath, "assets/") {
-		osPath = "assets/" + osPath
-	}
-	return os.ReadFile(osPath)
+	// Fallback: read directly from the OS filesystem path
+	return os.ReadFile(fullPath)
 }

@@ -6,10 +6,15 @@ This document defines the constraints, formats, symbol-item maps, and engine mec
 
 ## 1. Directory Structure Conventions
 
-Missions must be placed under the `assets/missions/` directory. Each mission has its own folder containing a metadata file and a subfolder for its levels:
+Missions can reside in two locations:
+
+1. **Embedded / Dev Repository Location**: Located under the `assets/missions/` directory. Useful for built-in or pre-bundled story campaigns.
+2. **External / Binary Parallel Location**: Located under the `missions/` directory parallel to the executable binary (e.g. `./missions/`). Useful for user-created custom levels and distribution.
+
+Each mission directory contains a metadata file and a subfolder for its levels:
 
 ```
-assets/missions/[mission_id]/
+[missions_root]/[mission_id]/
 ├── mission.json
 └── maps/
     ├── [level_01_id].json
