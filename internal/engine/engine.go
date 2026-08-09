@@ -510,6 +510,9 @@ func (e *Engine) getVisibleTileRange() (int, int, int, int) {
 }
 
 func (e *Engine) updateAudioModulation() {
+	if e.EcsWorld == nil {
+		return
+	}
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
@@ -529,6 +532,9 @@ func (e *Engine) updateAudioModulation() {
 }
 
 func (e *Engine) getPlayerPosition() (components.Position, bool) {
+	if e.EcsWorld == nil {
+		return components.Position{}, false
+	}
 	targetMask := components.MaskPlayerControl | components.MaskPosition
 	for i := ecs.Entity(0); i < ecs.MaxEntities; i++ {
 		if (e.EcsWorld.Masks[i] & targetMask) == targetMask {
