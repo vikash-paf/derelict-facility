@@ -288,11 +288,16 @@ func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *missi
 }
 
 func spawnHydroponics(w *ecs.World, gameMap *world.Map) {
-	// Find sunlit tiles ('S' / '*') and spawn hydroponics plants there
+	// Find sunlit tiles ('S' / '*') and spawn hydroponics plants sparsely
 	for y := 0; y < gameMap.Height; y++ {
 		for x := 0; x < gameMap.Width; x++ {
 			tile := gameMap.GetTile(x, y)
 			if tile != nil && tile.IsSunlit && tile.Type == world.TileTypeFloor {
+				// Spawn only on 1 out of 10 sunlit tiles to prevent MaxEntities overflow
+				if (x*7+y*13)%10 != 0 {
+					continue
+				}
+
 				// Don't spawn if there's already an entity there
 				isOccupied := false
 				for i := range ecs.Entity(ecs.MaxEntities) {
