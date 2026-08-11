@@ -21,20 +21,26 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 
 			if isPowered || isSunlit {
 				// Breathing safely: restore O2 and clean toxins
-				survival.Oxygen = min(survival.MaxOxygen, survival.Oxygen+0.4)
+				survival.Oxygen = min(survival.MaxOxygen, survival.Oxygen+0.6)
 				if survival.Toxicity > 0 {
-					survival.Toxicity = max(0.0, survival.Toxicity-0.1)
+					// Faster toxin clearing when breathing safely
+					survival.Toxicity = max(0.0, survival.Toxicity-0.2)
 				}
 				if playerCtrl.Status == components.PlayerStatusSuffocating {
 					playerCtrl.Status = components.PlayerStatusHealthy
 				}
+				
+				// Passive health recovery: regenerate health slowly (+1 HP per 3 ticks) in safe zones if clean of toxins
+				if survival.Toxicity == 0.0 && survival.Health < survival.MaxHealth {
+					survival.Health = min(survival.MaxHealth, survival.Health+0.35)
+				}
 			} else {
-				// Dangerous dark/unpowered zone: deplete O2
-				survival.Oxygen = max(0.0, survival.Oxygen-0.15)
+				// Dangerous dark/unpowered zone: deplete O2 more slowly (0.08 down from 0.15)
+				survival.Oxygen = max(0.0, survival.Oxygen-0.08)
 				if survival.Oxygen <= 0.0 {
-					// Suffocation sets in: toxicity grows and health drops
-					survival.Toxicity = min(100.0, survival.Toxicity+0.5)
-					survival.Health = max(0.0, survival.Health-0.4)
+					// Suffocation sets in: toxicity grows and health drops slightly slower (0.20 down from 0.4)
+					survival.Toxicity = min(100.0, survival.Toxicity+0.3)
+					survival.Health = max(0.0, survival.Health-0.2)
 					playerCtrl.Status = components.PlayerStatusSuffocating
 				} else {
 					if playerCtrl.Status == components.PlayerStatusSuffocating {
@@ -43,9 +49,9 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 				}
 			}
 
-			// Apply health decay if heavily toxic
+			// Apply health decay if heavily toxic (reduced from 0.1 to 0.05 per tick)
 			if survival.Toxicity >= 50.0 {
-				survival.Health = max(0.0, survival.Health-0.1)
+				survival.Health = max(0.0, survival.Health-0.05)
 				if playerCtrl.Status != components.PlayerStatusSuffocating {
 					playerCtrl.Status = components.PlayerStatusSick
 				}
@@ -60,6 +66,7 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 		}
 	}
 }
+
 
 func min(a, b float64) float64 {
 	if a < b {

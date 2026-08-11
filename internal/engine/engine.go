@@ -544,10 +544,11 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 			}
 			e.updateCamera()
 		}
-		if event.Key == rl.KeyBackspace {
+		if event.Code == int(rl.KeyBackspace) {
 			e.Audio.ToggleMute()
 		}
 		if event.Key == rl.KeyC {
+
 			e.Display.ToggleShader()
 		}
 

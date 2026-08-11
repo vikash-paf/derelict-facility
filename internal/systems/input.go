@@ -283,13 +283,15 @@ func handleInteraction(
 			if tile != nil && tile.PlantStage == world.PlantStageMature && foundPlayer {
 				playerCtrl := &w.PlayerControls[playerEntID]
 				if tile.YieldItemType == "O2_CAPSULE" {
-					playerCtrl.Survival.Oxygen = min(playerCtrl.Survival.MaxOxygen, playerCtrl.Survival.Oxygen+40.0)
-					logFunc("Harvested plant: Restored 40% Oxygen.")
+					playerCtrl.Survival.Oxygen = min(playerCtrl.Survival.MaxOxygen, playerCtrl.Survival.Oxygen+50.0)
+
+					logFunc("Harvested plant: Restored 50% Oxygen.")
 				} else if tile.YieldItemType == "MEDPACK" {
-					playerCtrl.Survival.Toxicity = max(0.0, playerCtrl.Survival.Toxicity-30.0)
-					playerCtrl.Survival.Health = min(playerCtrl.Survival.MaxHealth, playerCtrl.Survival.Health+25.0)
-					logFunc("Harvested plant: Treated toxicity (-30%) and healed 25 HP.")
+					playerCtrl.Survival.Toxicity = max(0.0, playerCtrl.Survival.Toxicity-50.0)
+					playerCtrl.Survival.Health = min(playerCtrl.Survival.MaxHealth, playerCtrl.Survival.Health+40.0)
+					logFunc("Harvested plant: Cleared 50% Toxicity and healed 40 HP.")
 				}
+
 
 				if audioFunc != nil {
 					audioFunc("generator_toggle")
