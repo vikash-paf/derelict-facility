@@ -778,7 +778,7 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 			}
 			
 			// Highlight mature plants with bright yellow interaction hint if adjacent to player
-			ctrl, pos, found := e.getPlayerControlAndPosition()
+			_, pos, found := e.getPlayerControlAndPosition()
 			if found && tile.PlantStage == world.PlantStageMature {
 				dx := pos.X - x
 				dy := pos.Y - y
@@ -788,6 +788,7 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 					}
 				}
 			}
+
 
 			e.Display.DrawText(x, y, char, color)
 		}
