@@ -1034,9 +1034,9 @@ func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
 
 
 func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool, survival components.PlayerSurvival) {
-	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
+	e.drawText(2, hudY+1, fmt.Sprintf("STATUS: %-11s", statusText), core.Cyan)
 
-	// Draw Health, O2, and Toxicity Gauges
+	// Draw Health, O2, and Toxicity Gauges shifted right to avoid overlaps
 	hpFill := int(survival.Health / 10.0)
 	o2Fill := int(survival.Oxygen / 10.0)
 	toxFill := int(survival.Toxicity / 10.0)
@@ -1045,7 +1045,7 @@ func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngag
 	o2Bar := strings.Repeat("█", o2Fill) + strings.Repeat("░", 10-o2Fill)
 	toxBar := strings.Repeat("█", toxFill) + strings.Repeat("░", 10-toxFill)
 
-	e.drawText(22, hudY+1, fmt.Sprintf("HP  [%s] %3.0f%%", hpBar, survival.Health), core.Green)
+	e.drawText(24, hudY+1, fmt.Sprintf("HP [%s] %3.0f%%", hpBar, survival.Health), core.Green)
 	
 	o2Color := core.Green
 	if survival.Oxygen < 30.0 {
@@ -1053,7 +1053,7 @@ func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngag
 	} else if survival.Oxygen < 60.0 {
 		o2Color = core.Yellow
 	}
-	e.drawText(46, hudY+1, fmt.Sprintf("O2  [%s] %3.0f%%", o2Bar, survival.Oxygen), o2Color)
+	e.drawText(47, hudY+1, fmt.Sprintf("O2 [%s] %3.0f%%", o2Bar, survival.Oxygen), o2Color)
 
 	toxColor := core.Gray
 	if survival.Toxicity > 50.0 {
