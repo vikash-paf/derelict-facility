@@ -310,8 +310,12 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	if rl.IsKeyPressed(rl.KeyR) {
 		events = append(events, core.InputEvent{Key: rl.KeyR})
 	}
+	if rl.IsKeyPressed(rl.KeyBackspace) {
+		events = append(events, core.InputEvent{Key: rl.KeyBackspace})
+	}
 	return events
 }
+
 
 // DarkenColor takes a core.Color and reduces its brightness by the given factor.
 func DarkenColor(color core.Color, factor uint8) core.Color {
