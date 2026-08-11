@@ -29,7 +29,7 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 				if playerCtrl.Status == components.PlayerStatusSuffocating {
 					playerCtrl.Status = components.PlayerStatusHealthy
 				}
-				
+
 				// Passive health recovery: regenerate health slowly (+1 HP per 3 ticks) in safe zones if clean of toxins
 				if survival.Toxicity == 0.0 && survival.Health < survival.MaxHealth {
 					survival.Health = min(survival.MaxHealth, survival.Health+0.35)
@@ -66,7 +66,6 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 		}
 	}
 }
-
 
 func min(a, b float64) float64 {
 	if a < b {

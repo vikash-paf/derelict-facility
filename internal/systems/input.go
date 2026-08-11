@@ -292,7 +292,6 @@ func handleInteraction(
 					logFunc("Harvested plant: Cleared 50% Toxicity and healed 40 HP.")
 				}
 
-
 				if audioFunc != nil {
 					audioFunc("generator_toggle")
 				}

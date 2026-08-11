@@ -50,31 +50,30 @@ func (s GameState) Flip() GameState {
 	return s
 }
 
-
 type LevelState struct {
 	Map      *world.Map
 	EcsWorld *ecs.World
 }
 
 type Engine struct {
-	Display       display.Display
-	Audio         *audio.AudioManager
-	Map           *world.Map
-	EcsWorld      *ecs.World
-	BaseTheme     world.TileVariant
-	TickerRate    time.Duration
-	tickCount     int
-	Clock         *world.FacilityClock
-	State         GameState
-	Menu          *menu.MenuState
-	Running       bool
-	PathLookup    []bool // Pre-allocated array to avoid map allocations per frame
-	Pathfinder    *world.Pathfinder
-	Messages      []string
-	Camera        rl.Camera2D
-	ActiveMission *mission.MissionManifest // nil if using procedural map
-	ActiveLevelID string                   // current level ID within the mission
-	LevelCache    map[string]*LevelState
+	Display        display.Display
+	Audio          *audio.AudioManager
+	Map            *world.Map
+	EcsWorld       *ecs.World
+	BaseTheme      world.TileVariant
+	TickerRate     time.Duration
+	tickCount      int
+	Clock          *world.FacilityClock
+	State          GameState
+	Menu           *menu.MenuState
+	Running        bool
+	PathLookup     []bool // Pre-allocated array to avoid map allocations per frame
+	Pathfinder     *world.Pathfinder
+	Messages       []string
+	Camera         rl.Camera2D
+	ActiveMission  *mission.MissionManifest // nil if using procedural map
+	ActiveLevelID  string                   // current level ID within the mission
+	LevelCache     map[string]*LevelState
 	heartbeatTimer float64
 }
 
@@ -110,7 +109,6 @@ func NewEngine(
 		e.PathLookup = make([]bool, gameMap.Width*gameMap.Height)
 		e.Pathfinder = world.NewPathfinder(gameMap.Width, gameMap.Height)
 	}
-
 
 	return e
 }
@@ -157,11 +155,11 @@ func (e *Engine) handleGameOverInput(events []core.InputEvent) {
 				e.Clock.TotalTicks = saveData.TotalTicks
 				e.Clock.Day = saveData.Day
 				e.Clock.Season = world.Season(saveData.Season)
-				
+
 				e.PathLookup = make([]bool, e.Map.Width*e.Map.Height)
 				e.Pathfinder = world.NewPathfinder(e.Map.Width, e.Map.Height)
 				e.LevelCache = make(map[string]*LevelState) // reset level caches
-				
+
 				e.Messages = []string{"Checkpoint restored successfully."}
 				e.State = GameStateRunning
 				fmt.Println("Checkpoint restored successfully from savegame.sav")
@@ -176,8 +174,6 @@ func (e *Engine) handleGameOverInput(events []core.InputEvent) {
 		}
 	}
 }
-
-
 
 func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
 	for _, event := range events {
@@ -211,7 +207,6 @@ func (e *Engine) launchSelectedMission() {
 		e.loadLevelByID(e.ActiveLevelID, 0, defaultSurvival, false, true) // true = starting fresh, spawn at @
 		return
 	}
-
 
 	// Procedural fallback: generate a random map
 	e.ActiveMission = nil
@@ -328,7 +323,6 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, existin
 	e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Level %q not found in mission", levelID))
 }
 
-
 // arrivalSpawnPos finds the elevator in the destination map that the player steps out of.
 // goingUp=true means player rode UP (<) so they arrive at the > elevator (IsUp=false).
 // goingUp=false means player rode DOWN (>) so they arrive at the < elevator (IsUp=true).
@@ -393,7 +387,6 @@ func (e *Engine) transferPlayerSurvival(survival components.PlayerSurvival) {
 	}
 }
 
-
 // buildMissionWorld constructs the ECS world for a given map.
 // manifest and levelID are optional — if provided, stairway entities are given
 // their correct TargetLevelID based on position within the level sequence.
@@ -424,7 +417,6 @@ func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *missi
 }
 
 func spawnGenerators(w *ecs.World, gameMap *world.Map) {
-
 
 	for _, genInfo := range gameMap.PowerGenerators {
 		genEnt := w.CreateEntity()
@@ -608,7 +600,6 @@ func (e *Engine) updateHeartbeat(dt float64) {
 
 }
 
-
 func (e *Engine) processSimulation(events []core.InputEvent) {
 
 	// Capture clearance and survival metrics before processing so we can transfer it on level change
@@ -636,8 +627,6 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		systems.SaveState(e.EcsWorld, e.Map, e.ActiveMission, e.ActiveLevelID, e.Clock.TotalTicks, e.Clock.Day, uint8(e.Clock.Season))
 	})
 
-
-
 	// Run Life Support tick (deplete O2/gain Toxicity) and Hydroponics growth tick
 	systems.ProcessLifeSupport(e.EcsWorld, e.Map, e.Clock, func(msg string) {
 		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
@@ -661,7 +650,6 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 			break
 		}
 	}
-
 
 	// Center camera on player
 	e.updateCamera()
@@ -896,7 +884,6 @@ func (e *Engine) renderGameOver() {
 	e.drawTextCentered(18, "Press [M] to Abort to Main Menu", core.Gray)
 }
 
-
 func (e *Engine) populatePathLookup() {
 	clear(e.PathLookup)
 	for i := range ecs.Entity(ecs.MaxEntities) {
@@ -957,7 +944,6 @@ func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color 
 	return bgColor
 }
 
-
 func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.TileVariant) (string, core.Color) {
 	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 	if char == "╬" || char == "#" || char == "█" || char == "▓" {
@@ -1014,13 +1000,13 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 					color = core.Color{R: 240, G: 50, B: 240, A: 255} // purple-magenta for medical
 				}
 			}
-			
+
 			// Highlight mature plants with bright yellow interaction hint if adjacent to player
 			_, pos, found := e.getPlayerControlAndPosition()
 			if found && tile.PlantStage == world.PlantStageMature {
 				dx := pos.X - x
 				dy := pos.Y - y
-				if dx*dx + dy*dy <= 2 {
+				if dx*dx+dy*dy <= 2 {
 					if e.tickCount%30 < 15 {
 						color = core.Yellow
 					}
@@ -1054,7 +1040,7 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.TileVariant) {
 	if tile.Type == world.TileTypeFloor {
 		e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
-		
+
 		// Render dim plants in fog of war
 		if tile.PlantStage != world.PlantStageNone {
 			char := "h"
@@ -1069,7 +1055,6 @@ func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.Tile
 		return
 	}
 
-
 	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 	if tile.Type == world.TileTypeWall {
 		char, _ = e.getWallGlyphAndColor(x, y, tile, theme)
@@ -1078,7 +1063,6 @@ func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.Tile
 	dimColor := display.DarkenColor(color, 4)
 	e.Display.DrawText(x, y, char, dimColor)
 }
-
 
 func (e *Engine) renderSingleMapTile(x, y int, theme world.TileVariant) {
 	tile := e.Map.GetTile(x, y)
@@ -1149,7 +1133,6 @@ func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
 	return ""
 }
 
-
 func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool, survival components.PlayerSurvival) {
 	e.drawText(2, hudY+1, fmt.Sprintf("STATUS: %-11s", statusText), core.Cyan)
 
@@ -1163,7 +1146,7 @@ func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngag
 	toxBar := strings.Repeat("█", toxFill) + strings.Repeat("░", 10-toxFill)
 
 	e.drawText(24, hudY+1, fmt.Sprintf("HP [%s] %3.0f%%", hpBar, survival.Health), core.Green)
-	
+
 	o2Color := core.Green
 	if survival.Oxygen < 30.0 {
 		o2Color = core.Red
@@ -1264,4 +1247,3 @@ func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
 func (e *Engine) drawText(x, y int, text string, color core.Color) {
 	e.Display.DrawText(x, y, text, color)
 }
-
