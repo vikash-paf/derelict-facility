@@ -101,9 +101,21 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 					t := m.GetTile(rx, ry)
 					if t != nil {
 						t.IsSunlit = true
+						// Spawn plants on ~12% of tiles sparsely
+						if f.rng.IntN(8) == 0 {
+							t.PlantStage = PlantStageSeed
+							t.GrowthProgress = 0.0
+							t.GrowthRate = 1.5
+							yield := "O2_CAPSULE"
+							if (rx+ry)%2 == 0 {
+								yield = "MEDPACK"
+							}
+							t.YieldItemType = yield
+						}
 					}
 				}
 			}
+
 		} else {
 			prevRoom := rooms[len(rooms)-1]
 			prevX, prevY := prevRoom.Center()

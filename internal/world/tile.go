@@ -8,6 +8,15 @@ const (
 	TileTypeFloor
 )
 
+type PlantStage uint8
+
+const (
+	PlantStageNone PlantStage = iota
+	PlantStageSeed
+	PlantStageSprout
+	PlantStageMature
+)
+
 type Tile struct {
 	Type              TileType
 	Walkable          bool
@@ -18,6 +27,12 @@ type Tile struct {
 	Variant           uint8   // Stores procedural noise/texture data
 	Distance          int     // Distance from the player when last visible (for depth shading)
 	Bitmask           uint8   // 4-bit mask storing neighbor data for auto-tiling walls
+
+	// Plant attributes
+	PlantStage     PlantStage
+	GrowthProgress float64
+	GrowthRate     float64
+	YieldItemType  string
 }
 
 // Cardinal Wall Connection Bitmasks

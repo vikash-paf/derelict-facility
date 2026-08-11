@@ -16,6 +16,7 @@ const (
 	SoundDoorClose       SoundID = "door_close"
 	SoundAccessDenied    SoundID = "access_denied"
 	SoundTerminalAccess  SoundID = "terminal_access"
+	SoundHeartbeat       SoundID = "heartbeat"
 )
 
 type AudioManager struct {
@@ -47,6 +48,7 @@ func (a *AudioManager) Init() {
 		SoundDoorClose:       "audio/door_close.wav",
 		SoundAccessDenied:    "audio/access_denied.wav",
 		SoundTerminalAccess:  "audio/terminal_access.wav",
+		SoundHeartbeat:       "audio/heartbeat.wav",
 	}
 
 	for id, filePath := range soundFiles {

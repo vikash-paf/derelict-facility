@@ -25,7 +25,7 @@ func IsSolidAt(w *ecs.World, x, y int) bool {
 }
 
 // ProcessPlayerInput handles intentional movement from W/A/S/D.
-func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
+func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool), saveFunc func()) {
 	dx, dy := 0, 0
 	toggleAutopilot := false
 	interactPressed := false
@@ -59,7 +59,7 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 
 			if interactPressed {
 				// Find adjacent interactable entities
-				handleInteraction(w, positions.X, positions.Y, gameMap, activeMission, activeLevelID, logFunc, audioFunc, transitionFunc)
+				handleInteraction(w, positions.X, positions.Y, gameMap, activeMission, activeLevelID, logFunc, audioFunc, transitionFunc, saveFunc)
 			}
 
 			// Disable autopilot if manual movement keys are pressed
@@ -164,7 +164,7 @@ func interactWithDoor(w *ecs.World, ent ecs.Entity, playerClearance uint32, logF
 	}
 }
 
-func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string)) {
+func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), saveFunc func()) {
 	terminal := &w.Terminals[ent]
 
 	if audioFunc != nil {
@@ -190,7 +190,9 @@ func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, 
 		if (w.Masks[ent] & components.MaskGlyph) != 0 {
 			w.Glyphs[ent].Color = core.Green
 		}
-		saveState(w, gameMap, activeMission, activeLevelID)
+		if saveFunc != nil {
+			saveFunc()
+		}
 		logFunc("Checkpoint saved.")
 	}
 }
@@ -222,7 +224,7 @@ func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, 
 }
 
 func handleInteraction(
-	world *ecs.World,
+	w *ecs.World,
 	playerX, playerY int,
 	gameMap *world.Map,
 	activeMission *mission.MissionManifest,
@@ -230,14 +232,15 @@ func handleInteraction(
 	logFunc func(string),
 	audioFunc func(string),
 	transitionFunc func(string, bool),
+	saveFunc func(),
 ) {
 	// Find the player's clearance first
 	playerClearance := uint32(0)
 	playerEntID := ecs.Entity(0)
 	foundPlayer := false
 	for i := range ecs.Entity(ecs.MaxEntities) {
-		if world.IsPlayer(i) {
-			playerClearance = world.PlayerControls[i].SecurityClearance
+		if w.IsPlayer(i) {
+			playerClearance = w.PlayerControls[i].SecurityClearance
 			playerEntID = i
 			foundPlayer = true
 			break
@@ -245,8 +248,8 @@ func handleInteraction(
 	}
 
 	for i := range ecs.Entity(ecs.MaxEntities) {
-		if world.HasPosition(i) && world.IsInteractable(i) {
-			pos := world.Positions[i]
+		if w.HasPosition(i) && w.IsInteractable(i) {
+			pos := w.Positions[i]
 			// Check adjacency
 			dx := pos.X - playerX
 			dy := pos.Y - playerY
@@ -254,19 +257,49 @@ func handleInteraction(
 
 			if distSq <= 2 {
 				switch {
-				case world.IsPowerGenerator(i):
-					interactWithGenerator(world, i, logFunc, audioFunc)
+				case w.IsPowerGenerator(i):
+					interactWithGenerator(w, i, logFunc, audioFunc)
 					return
-				case world.IsDoor(i):
-					interactWithDoor(world, i, playerClearance, logFunc, audioFunc)
+				case w.IsDoor(i):
+					interactWithDoor(w, i, playerClearance, logFunc, audioFunc)
 					return
-				case world.IsTerminal(i):
-					interactWithTerminal(world, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
+				case w.IsTerminal(i):
+					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc, saveFunc)
 					return
-				case world.IsStairway(i):
-					interactWithStairway(world, i, playerClearance, logFunc, audioFunc, transitionFunc)
+				case w.IsStairway(i):
+					interactWithStairway(w, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
 				}
+			}
+		}
+	}
+
+	// Check if player is standing on or adjacent to a harvestable map-tile plant
+	for dy := -1; dy <= 1; dy++ {
+		for dx := -1; dx <= 1; dx++ {
+			tx := playerX + dx
+			ty := playerY + dy
+			tile := gameMap.GetTile(tx, ty)
+			if tile != nil && tile.PlantStage == world.PlantStageMature && foundPlayer {
+				playerCtrl := &w.PlayerControls[playerEntID]
+				if tile.YieldItemType == "O2_CAPSULE" {
+					playerCtrl.Survival.Oxygen = min(playerCtrl.Survival.MaxOxygen, playerCtrl.Survival.Oxygen+50.0)
+
+					logFunc("Harvested plant: Restored 50% Oxygen.")
+				} else if tile.YieldItemType == "MEDPACK" {
+					playerCtrl.Survival.Toxicity = max(0.0, playerCtrl.Survival.Toxicity-50.0)
+					playerCtrl.Survival.Health = min(playerCtrl.Survival.MaxHealth, playerCtrl.Survival.Health+40.0)
+					logFunc("Harvested plant: Cleared 50% Toxicity and healed 40 HP.")
+				}
+
+				if audioFunc != nil {
+					audioFunc("generator_toggle")
+				}
+
+				// Reset tile plant state
+				tile.PlantStage = world.PlantStageSeed
+				tile.GrowthProgress = 0.0
+				return
 			}
 		}
 	}

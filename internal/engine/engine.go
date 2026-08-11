@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ const (
 	GameStateMainMenu GameState = iota
 	GameStateRunning
 	GameStatePaused
+	GameStateGameOver
 )
 
 // Flip toggles between Paused and Running states
@@ -48,24 +50,31 @@ func (s GameState) Flip() GameState {
 	return s
 }
 
+type LevelState struct {
+	Map      *world.Map
+	EcsWorld *ecs.World
+}
+
 type Engine struct {
-	Display       display.Display
-	Audio         *audio.AudioManager
-	Map           *world.Map
-	EcsWorld      *ecs.World
-	BaseTheme     world.TileVariant
-	TickerRate    time.Duration
-	tickCount     int
-	Clock         *world.FacilityClock
-	State         GameState
-	Menu          *menu.MenuState
-	Running       bool
-	PathLookup    []bool // Pre-allocated array to avoid map allocations per frame
-	Pathfinder    *world.Pathfinder
-	Messages      []string
-	Camera        rl.Camera2D
-	ActiveMission *mission.MissionManifest // nil if using procedural map
-	ActiveLevelID string                   // current level ID within the mission
+	Display        display.Display
+	Audio          *audio.AudioManager
+	Map            *world.Map
+	EcsWorld       *ecs.World
+	BaseTheme      world.TileVariant
+	TickerRate     time.Duration
+	tickCount      int
+	Clock          *world.FacilityClock
+	State          GameState
+	Menu           *menu.MenuState
+	Running        bool
+	PathLookup     []bool // Pre-allocated array to avoid map allocations per frame
+	Pathfinder     *world.Pathfinder
+	Messages       []string
+	Camera         rl.Camera2D
+	ActiveMission  *mission.MissionManifest // nil if using procedural map
+	ActiveLevelID  string                   // current level ID within the mission
+	LevelCache     map[string]*LevelState
+	heartbeatTimer float64
 }
 
 func NewEngine(
@@ -89,6 +98,7 @@ func NewEngine(
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
 		Clock:      world.NewFacilityClock(),
+		LevelCache: make(map[string]*LevelState),
 		Camera: rl.Camera2D{
 			Zoom:   1.0,
 			Offset: rl.NewVector2(500, 300), // center of 1000x600 viewport
@@ -120,6 +130,8 @@ func (e *Engine) Run() error {
 
 		if e.State == GameStateMainMenu {
 			e.handleMainMenuInput(events)
+		} else if e.State == GameStateGameOver {
+			e.handleGameOverInput(events)
 		} else if e.State == GameStateRunning {
 			e.Update(events) // Calculate all game rules!
 		}
@@ -128,6 +140,39 @@ func (e *Engine) Run() error {
 	}
 
 	return nil
+}
+
+func (e *Engine) handleGameOverInput(events []core.InputEvent) {
+	for _, event := range events {
+		if event.Key == rl.KeyR {
+			// Restore savegame
+			saveData, err := systems.LoadState()
+			if err == nil {
+				e.EcsWorld = saveData.World
+				e.Map = saveData.Map
+				e.ActiveLevelID = saveData.ActiveLevelID
+				e.ActiveMission = saveData.ActiveMission
+				e.Clock.TotalTicks = saveData.TotalTicks
+				e.Clock.Day = saveData.Day
+				e.Clock.Season = world.Season(saveData.Season)
+
+				e.PathLookup = make([]bool, e.Map.Width*e.Map.Height)
+				e.Pathfinder = world.NewPathfinder(e.Map.Width, e.Map.Height)
+				e.LevelCache = make(map[string]*LevelState) // reset level caches
+
+				e.Messages = []string{"Checkpoint restored successfully."}
+				e.State = GameStateRunning
+				fmt.Println("Checkpoint restored successfully from savegame.sav")
+			} else {
+				errMsg := fmt.Sprintf("Load checkpoint failed: %v", err)
+				e.Messages = []string{errMsg}
+				fmt.Println(errMsg)
+			}
+		}
+		if event.Key == rl.KeyM {
+			e.State = GameStateMainMenu
+		}
+	}
 }
 
 func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
@@ -152,7 +197,14 @@ func (e *Engine) launchSelectedMission() {
 	if item.Manifest != nil {
 		e.ActiveMission = item.Manifest
 		e.ActiveLevelID = item.Manifest.StartLevel
-		e.loadLevelByID(e.ActiveLevelID, 0, false, true) // true = starting fresh, spawn at @
+		defaultSurvival := components.PlayerSurvival{
+			Oxygen:    100.0,
+			Toxicity:  0.0,
+			MaxOxygen: 100.0,
+			Health:    100.0,
+			MaxHealth: 100.0,
+		}
+		e.loadLevelByID(e.ActiveLevelID, 0, defaultSurvival, false, true) // true = starting fresh, spawn at @
 		return
 	}
 
@@ -166,15 +218,71 @@ func (e *Engine) launchSelectedMission() {
 	e.State = GameStateRunning
 }
 
-// loadLevelByID loads a specific level from the active mission manifest, preserving
-// the player's current security clearance across the transition.
-// goingUp indicates whether the player arrived via an ascending (<) or descending (>) elevator,
-// which determines which elevator in the destination they spawn next to.
-func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool, isStart bool) {
+func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, existingSurvival components.PlayerSurvival, goingUp bool, isStart bool) {
+
 	if e.ActiveMission == nil {
 		return
 	}
 
+	// 1. Cache the current level state before transitioning
+	if e.ActiveLevelID != "" && e.Map != nil && e.EcsWorld != nil {
+		// Clean up the player's control path to avoid moving on arrival
+		for i := range ecs.Entity(ecs.MaxEntities) {
+			if e.EcsWorld.IsPlayer(i) {
+				e.EcsWorld.PlayerControls[i].CurrentPath = nil
+				e.EcsWorld.PlayerControls[i].Autopilot = false
+				break
+			}
+		}
+		e.LevelCache[e.ActiveLevelID] = &LevelState{
+			Map:      e.Map,
+			EcsWorld: e.EcsWorld,
+		}
+	}
+
+	// 2. Try loading the level state from cache
+	if cached, exists := e.LevelCache[levelID]; exists && !isStart {
+		// Level is already cached. Restore it!
+		e.ActiveLevelID = levelID
+		e.Map = cached.Map
+		e.EcsWorld = cached.EcsWorld
+		e.PathLookup = make([]bool, e.Map.Width*e.Map.Height)
+		e.Pathfinder = world.NewPathfinder(e.Map.Width, e.Map.Height)
+		e.Messages = nil
+
+		// Find player start or elevator spawn coordinate
+		var spawnX, spawnY int
+		// Resolve arrival coordinate on cached map
+		for _, lvl := range e.ActiveMission.Levels {
+			if lvl.ID == levelID {
+				data, err := e.ActiveMission.LoadLevelMapData(lvl.File)
+				if err == nil {
+					loader := world.NewJSONMapLoader()
+					if _, defX, defY, err := loader.LoadBytes(data); err == nil {
+						spawnX, spawnY = arrivalSpawnPos(e.Map, goingUp, defX, defY)
+					}
+				}
+				break
+			}
+		}
+
+		// Update cached player entity coordinates to the new elevator entry point
+		for i := range ecs.Entity(ecs.MaxEntities) {
+			if e.EcsWorld.IsPlayer(i) {
+				e.EcsWorld.Positions[i] = components.Position{X: spawnX, Y: spawnY}
+				e.EcsWorld.PlayerControls[i].Survival = existingSurvival
+				break
+			}
+		}
+
+		if existingClearance != 0 {
+			e.transferPlayerClearance(existingClearance)
+		}
+		e.State = GameStateRunning
+		return
+	}
+
+	// 3. Fallback: Parse from map JSON file (First visit)
 	for _, lvl := range e.ActiveMission.Levels {
 		if lvl.ID != levelID {
 			continue
@@ -204,6 +312,7 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 
 		e.ActiveLevelID = levelID
 		e.activateMap(loadedMap, spawnX, spawnY, e.ActiveMission, levelID)
+		e.transferPlayerSurvival(existingSurvival)
 		if existingClearance != 0 {
 			e.transferPlayerClearance(existingClearance)
 		}
@@ -240,6 +349,7 @@ func (e *Engine) activateMap(gameMap *world.Map, playerX, playerY int, manifest 
 // transferPlayerClearance copies clearance bits from a previous level into the current ECS world player.
 func (e *Engine) transferPlayerClearance(clearance uint32) {
 	for i := range ecs.Entity(ecs.MaxEntities) {
+
 		if e.EcsWorld.IsPlayer(i) {
 			e.EcsWorld.PlayerControls[i].SecurityClearance = clearance
 			return
@@ -257,6 +367,26 @@ func (e *Engine) playerClearance() uint32 {
 	return 0
 }
 
+// playerSurvival returns the current player's survival metrics.
+func (e *Engine) playerSurvival() (components.PlayerSurvival, bool) {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
+			return e.EcsWorld.PlayerControls[i].Survival, true
+		}
+	}
+	return components.PlayerSurvival{}, false
+}
+
+// transferPlayerSurvival copies survival attributes to the newly loaded player.
+func (e *Engine) transferPlayerSurvival(survival components.PlayerSurvival) {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
+			e.EcsWorld.PlayerControls[i].Survival = survival
+			return
+		}
+	}
+}
+
 // buildMissionWorld constructs the ECS world for a given map.
 // manifest and levelID are optional — if provided, stairway entities are given
 // their correct TargetLevelID based on position within the level sequence.
@@ -269,6 +399,13 @@ func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *missi
 	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,
+		Survival: components.PlayerSurvival{
+			Oxygen:    100.0,
+			Toxicity:  0.0,
+			MaxOxygen: 100.0,
+			Health:    100.0,
+			MaxHealth: 100.0,
+		},
 	})
 
 	spawnGenerators(ecsWorld, gameMap)
@@ -280,6 +417,7 @@ func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *missi
 }
 
 func spawnGenerators(w *ecs.World, gameMap *world.Map) {
+
 	for _, genInfo := range gameMap.PowerGenerators {
 		genEnt := w.CreateEntity()
 		w.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
@@ -398,12 +536,14 @@ func (e *Engine) handleInputForGlobals(events []core.InputEvent) {
 			}
 			e.updateCamera()
 		}
-		if event.Key == rl.KeyM {
+		if event.Code == int(rl.KeyBackspace) {
 			e.Audio.ToggleMute()
 		}
 		if event.Key == rl.KeyC {
+
 			e.Display.ToggleShader()
 		}
+
 	}
 }
 
@@ -420,12 +560,52 @@ func (e *Engine) Update(events []core.InputEvent) {
 	case GameStateRunning:
 		e.Clock.Tick()
 		e.processSimulation(events)
+		e.updateHeartbeat(0.033) // ~30 fps delta time is 33ms
 	}
 }
 
+func (e *Engine) updateHeartbeat(dt float64) {
+	ctrl, _, found := e.getPlayerControlAndPosition()
+	if !found {
+		return
+	}
+
+	healthPct := ctrl.Survival.Health / 100.0
+	toxPct := ctrl.Survival.Toxicity / 100.0
+
+	// Trigger audio warnings if health drops below 35% or toxicity goes above 40%
+	isCritical := healthPct < 0.35 || toxPct > 0.40
+	if !isCritical {
+		e.heartbeatTimer = 0
+		return
+	}
+
+	severity := 0.0
+	if healthPct < 0.35 {
+		severity = math.Max(severity, (0.35-healthPct)/0.35)
+	}
+	if toxPct > 0.40 {
+		severity = math.Max(severity, (toxPct-0.40)/0.60)
+	}
+
+	// Dynamic tempo mapping: 1.5 seconds down to 0.4 seconds pacing speed
+	minInterval := 0.4
+	maxInterval := 1.5
+	interval := maxInterval - (severity * (maxInterval - minInterval))
+	e.heartbeatTimer += dt
+	if e.heartbeatTimer >= interval {
+		e.Audio.Play(audio.SoundHeartbeat)
+		e.heartbeatTimer = 0.0
+	}
+
+}
+
 func (e *Engine) processSimulation(events []core.InputEvent) {
-	// Capture clearance before processing so we can transfer it on level change
+
+	// Capture clearance and survival metrics before processing so we can transfer it on level change
+
 	clearanceBefore := e.playerClearance()
+	survivalBefore, _ := e.playerSurvival()
 
 	// Let the systems tick using the events we polled at the start of the frame!
 	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, e.ActiveMission, e.ActiveLevelID, func(msg string) {
@@ -441,8 +621,35 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	}, func(soundID string) {
 		e.Audio.Play(audio.SoundID(soundID))
 	}, func(targetLevelID string, goingUp bool) {
-		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp, false)
+		e.loadLevelByID(targetLevelID, clearanceBefore, survivalBefore, goingUp, false)
+	}, func() {
+		// Exported save callback triggers SaveState
+		systems.SaveState(e.EcsWorld, e.Map, e.ActiveMission, e.ActiveLevelID, e.Clock.TotalTicks, e.Clock.Day, uint8(e.Clock.Season))
 	})
+
+	// Run Life Support tick (deplete O2/gain Toxicity) and Hydroponics growth tick
+	systems.ProcessLifeSupport(e.EcsWorld, e.Map, e.Clock, func(msg string) {
+		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
+			return
+		}
+		e.Messages = append(e.Messages, msg)
+		if len(e.Messages) > 3 {
+			e.Messages = e.Messages[1:]
+		}
+	})
+
+	systems.ProcessHydroponics(e.EcsWorld, e.Map, e.Clock)
+
+	// Check if player health reaches 0 (Game Over)
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
+			if e.EcsWorld.PlayerControls[i].Survival.Health <= 0.0 {
+				e.Messages = append(e.Messages, "CRITICAL ERROR: BIOSPHERE ENGINEER ELIMINATED.")
+				e.State = GameStateGameOver
+			}
+			break
+		}
+	}
 
 	// Center camera on player
 	e.updateCamera()
@@ -601,6 +808,19 @@ func (e *Engine) updateCamera() {
 	if e.Map != nil {
 		e.clampCameraToMap(cellWidthVal, cellHeightVal)
 	}
+
+	// Apply disorientation wobble/sway if player has SICK status (from toxicity)
+	ctrl, _, controlFound := e.getPlayerControlAndPosition()
+	if controlFound && ctrl.Status == components.PlayerStatusSick {
+		t := float32(rl.GetTime())
+		// Wobble camera target position with wave combinations
+		e.Camera.Target.X += float32(math.Sin(float64(t*2.0))) * 12.0
+		e.Camera.Target.Y += float32(math.Cos(float64(t*1.5))) * 12.0
+		// Apply slight camera rotational roll (tilt)
+		e.Camera.Rotation = float32(math.Sin(float64(t*1.0))) * 2.5
+	} else {
+		e.Camera.Rotation = 0.0
+	}
 }
 
 // render updates the game screen by drawing the map, GameState overlays,
@@ -643,6 +863,8 @@ func (e *Engine) render() {
 	switch e.State {
 	case GameStatePaused:
 		e.renderPauseMenu()
+	case GameStateGameOver:
+		e.renderGameOver()
 	default:
 	}
 
@@ -653,6 +875,13 @@ func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(14, "=== SYSTEM PAUSED ===", core.Red)
 	e.drawTextCentered(16, "Press [ESC] to Resume", core.White)
 	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
+}
+
+func (e *Engine) renderGameOver() {
+	e.drawTextCentered(13, "=== CRITICAL FAILURE ===", core.Red)
+	e.drawTextCentered(15, "BIOSPHERE MAINTENANCE ENGINEER ELIMINATED", core.BrightWhite)
+	e.drawTextCentered(17, "Press [R] to Restore Checkpoint", core.Yellow)
+	e.drawTextCentered(18, "Press [M] to Abort to Main Menu", core.Gray)
 }
 
 func (e *Engine) populatePathLookup() {
@@ -669,6 +898,22 @@ func (e *Engine) populatePathLookup() {
 	}
 }
 
+func (e *Engine) getFlickerMultiplier(x, y int) float32 {
+	t := float64(e.tickCount)
+	// Compute offset wave patterns based on coordinate and time to differentiate rooms
+	wave := math.Sin(t*0.25+float64(x)*0.3) * math.Cos(t*0.18+float64(y)*0.4)
+	wave = (wave + 1.0) * 0.5
+
+	// Sudden emergency power sparks or dim glow
+	if wave > 0.88 {
+		return 0.15 // sudden darkness drop
+	}
+	if wave > 0.75 {
+		return 0.50 // dim light pulse
+	}
+	return 1.0 // full ambient light
+}
+
 func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color {
 	bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
 	sunColor := e.Clock.GetSunlightColor()
@@ -680,6 +925,15 @@ func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color 
 	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
 	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 	if !isTilePowered && !isSunlitByDay {
+		// Apply backup flickering FX to emergency lights
+		flicker := e.getFlickerMultiplier(x, y)
+		bgColor = core.Color{
+			R: uint8(float32(bgColor.R) * flicker),
+			G: uint8(float32(bgColor.G) * flicker),
+			B: uint8(float32(bgColor.B) * flicker),
+			A: bgColor.A,
+		}
+
 		if tile.Distance > 3 {
 			bgColor = display.DarkenColor(bgColor, 2)
 		}
@@ -730,14 +984,41 @@ func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.Ti
 }
 
 func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileVariant) {
-	char, color := theme[tile.Type].Char, theme[tile.Type].Color
-
 	if tile.Type == world.TileTypeFloor {
 		bgColor := e.getFloorBackgroundColor(x, y, tile)
 		e.Display.DrawRect(x, y, bgColor)
+
+		// Draw plant overlay if present
+		if tile.PlantStage != world.PlantStageNone {
+			char, color := "h", core.Color{R: 50, G: 120, B: 50, A: 255}
+			if tile.PlantStage == world.PlantStageSprout {
+				char, color = "y", core.Color{R: 120, G: 200, B: 120, A: 255}
+			} else if tile.PlantStage == world.PlantStageMature {
+				char, color = "H", core.Color{R: 50, G: 240, B: 50, A: 255}
+				// Use different colors to distinguish yields (O2 vs Medpack)
+				if tile.YieldItemType == "MEDPACK" {
+					color = core.Color{R: 240, G: 50, B: 240, A: 255} // purple-magenta for medical
+				}
+			}
+
+			// Highlight mature plants with bright yellow interaction hint if adjacent to player
+			_, pos, found := e.getPlayerControlAndPosition()
+			if found && tile.PlantStage == world.PlantStageMature {
+				dx := pos.X - x
+				dy := pos.Y - y
+				if dx*dx+dy*dy <= 2 {
+					if e.tickCount%30 < 15 {
+						color = core.Yellow
+					}
+				}
+			}
+
+			e.Display.DrawText(x, y, char, color)
+		}
 		return
 	}
 
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 	if tile.Type == world.TileTypeWall {
 		char, color = e.getWallGlyphAndColor(x, y, tile, theme)
 	}
@@ -759,6 +1040,18 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.TileVariant) {
 	if tile.Type == world.TileTypeFloor {
 		e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
+
+		// Render dim plants in fog of war
+		if tile.PlantStage != world.PlantStageNone {
+			char := "h"
+			if tile.PlantStage == world.PlantStageSprout {
+				char = "y"
+			} else if tile.PlantStage == world.PlantStageMature {
+				char = "H"
+			}
+			dimColor := core.Color{R: 20, G: 50, B: 20, A: 255}
+			e.Display.DrawText(x, y, char, dimColor)
+		}
 		return
 	}
 
@@ -815,6 +1108,18 @@ func (e *Engine) getPlayerControlAndPosition() (*components.PlayerControl, *comp
 }
 
 func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
+	// First check adjacent map-tile plants
+	for dy := -1; dy <= 1; dy++ {
+		for dx := -1; dx <= 1; dx++ {
+			tx := pX + dx
+			ty := pY + dy
+			tile := e.Map.GetTile(tx, ty)
+			if tile != nil && tile.PlantStage == world.PlantStageMature {
+				return "Press [E] to Harvest Crop"
+			}
+		}
+	}
+
 	for j := range ecs.Entity(ecs.MaxEntities) {
 		if e.EcsWorld.HasPosition(j) && e.EcsWorld.IsInteractable(j) {
 			targetPos := e.EcsWorld.Positions[j]
@@ -828,13 +1133,35 @@ func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
 	return ""
 }
 
-func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool) {
-	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
-	if autopilotEngaged {
-		e.drawText(22, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
-	} else {
-		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
+func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool, survival components.PlayerSurvival) {
+	e.drawText(2, hudY+1, fmt.Sprintf("STATUS: %-11s", statusText), core.Cyan)
+
+	// Draw Health, O2, and Toxicity Gauges shifted right to avoid overlaps
+	hpFill := int(survival.Health / 10.0)
+	o2Fill := int(survival.Oxygen / 10.0)
+	toxFill := int(survival.Toxicity / 10.0)
+
+	hpBar := strings.Repeat("█", hpFill) + strings.Repeat("░", 10-hpFill)
+	o2Bar := strings.Repeat("█", o2Fill) + strings.Repeat("░", 10-o2Fill)
+	toxBar := strings.Repeat("█", toxFill) + strings.Repeat("░", 10-toxFill)
+
+	e.drawText(24, hudY+1, fmt.Sprintf("HP [%s] %3.0f%%", hpBar, survival.Health), core.Green)
+
+	o2Color := core.Green
+	if survival.Oxygen < 30.0 {
+		o2Color = core.Red
+	} else if survival.Oxygen < 60.0 {
+		o2Color = core.Yellow
 	}
+	e.drawText(47, hudY+1, fmt.Sprintf("O2 [%s] %3.0f%%", o2Bar, survival.Oxygen), o2Color)
+
+	toxColor := core.Gray
+	if survival.Toxicity > 50.0 {
+		toxColor = core.Red
+	} else if survival.Toxicity > 20.0 {
+		toxColor = core.Yellow
+	}
+	e.drawText(70, hudY+1, fmt.Sprintf("TOX [%s] %3.0f%%", toxBar, survival.Toxicity), toxColor)
 }
 
 func (e *Engine) drawHUDMissionAndClock(hudY int) {
@@ -851,7 +1178,7 @@ func (e *Engine) drawHUDMissionAndClock(hudY int) {
 	if clockX < 55 {
 		clockX = 55
 	}
-	e.drawText(clockX, hudY+1, clockText, core.Yellow)
+	e.drawText(clockX, hudY+2, clockText, core.Yellow)
 }
 
 func (e *Engine) drawHUDInteractionPrompt(hudY int, interactPrompt string) {
@@ -894,16 +1221,16 @@ func (e *Engine) renderHUD() {
 	ctrl, pos, found := e.getPlayerControlAndPosition()
 
 	statusText := "HEALTHY"
-	autopilotEngaged := false
 	var interactPrompt string
+	var survival components.PlayerSurvival
 
 	if found {
 		statusText = ctrl.Status.Title()
-		autopilotEngaged = ctrl.Autopilot
 		interactPrompt = e.getNearbyInteractionPrompt(pos.X, pos.Y)
+		survival = ctrl.Survival
 	}
 
-	e.drawHUDStatusAndNav(hudY, statusText, autopilotEngaged)
+	e.drawHUDStatusAndNav(hudY, statusText, ctrl.Autopilot, survival)
 	e.drawHUDMissionAndClock(hudY)
 	e.drawHUDInteractionPrompt(hudY, interactPrompt)
 	e.drawHUDMessages(hudY)

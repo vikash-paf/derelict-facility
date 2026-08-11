@@ -43,6 +43,7 @@ const (
 	PlayerStatusHealthy PlayerStatus = iota
 	PlayerStatusSick
 	PlayerStatusHurt
+	PlayerStatusSuffocating
 )
 
 func (s PlayerStatus) Title() string {
@@ -53,9 +54,19 @@ func (s PlayerStatus) Title() string {
 		return "SICK / TOXIC"
 	case PlayerStatusHurt:
 		return "Hurt"
+	case PlayerStatusSuffocating:
+		return "SUFFOCATING"
 	default:
 		return "Unknown"
 	}
+}
+
+type PlayerSurvival struct {
+	Oxygen    float64
+	Toxicity  float64
+	MaxOxygen float64
+	Health    float64
+	MaxHealth float64
 }
 
 // Position holds exactly where an Entity is on the grid.
@@ -80,6 +91,7 @@ type PlayerControl struct {
 	CurrentPath       []entity.Point
 	Status            PlayerStatus
 	SecurityClearance uint32 // Bitmask of keys/clearances found
+	Survival          PlayerSurvival
 }
 
 // Glyph defines the graphical representation of an entity using a text character or emoji.
