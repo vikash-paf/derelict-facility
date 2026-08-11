@@ -35,6 +35,7 @@ const (
 	GameStateMainMenu GameState = iota
 	GameStateRunning
 	GameStatePaused
+	GameStateGameOver
 )
 
 // Flip toggles between Paused and Running states
@@ -47,6 +48,7 @@ func (s GameState) Flip() GameState {
 	}
 	return s
 }
+
 
 type LevelState struct {
 	Map      *world.Map
@@ -128,6 +130,8 @@ func (e *Engine) Run() error {
 
 		if e.State == GameStateMainMenu {
 			e.handleMainMenuInput(events)
+		} else if e.State == GameStateGameOver {
+			e.handleGameOverInput(events)
 		} else if e.State == GameStateRunning {
 			e.Update(events) // Calculate all game rules!
 		}
@@ -137,6 +141,37 @@ func (e *Engine) Run() error {
 
 	return nil
 }
+
+func (e *Engine) handleGameOverInput(events []core.InputEvent) {
+	for _, event := range events {
+		if event.Key == rl.KeyR {
+			// Restore savegame
+			saveData, err := systems.LoadState()
+			if err == nil {
+				e.EcsWorld = saveData.World
+				e.Map = saveData.Map
+				e.ActiveLevelID = saveData.ActiveLevelID
+				e.ActiveMission = saveData.ActiveMission
+				e.Clock.TotalTicks = saveData.TotalTicks
+				e.Clock.Day = saveData.Day
+				e.Clock.Season = world.Season(saveData.Season)
+				
+				e.PathLookup = make([]bool, e.Map.Width*e.Map.Height)
+				e.Pathfinder = world.NewPathfinder(e.Map.Width, e.Map.Height)
+				e.LevelCache = make(map[string]*LevelState) // reset level caches
+				
+				e.Messages = []string{"Checkpoint restored successfully."}
+				e.State = GameStateRunning
+			} else {
+				e.Messages = []string{"No saved checkpoint found."}
+			}
+		}
+		if event.Key == rl.KeyM {
+			e.State = GameStateMainMenu
+		}
+	}
+}
+
 
 func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
 	for _, event := range events {
@@ -539,12 +574,12 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		if e.EcsWorld.IsPlayer(i) {
 			if e.EcsWorld.PlayerControls[i].Survival.Health <= 0.0 {
 				e.Messages = append(e.Messages, "CRITICAL ERROR: BIOSPHERE ENGINEER ELIMINATED.")
-				// Reset player to safe values and bounce back to main menu
-				e.State = GameStateMainMenu
+				e.State = GameStateGameOver
 			}
 			break
 		}
 	}
+
 
 	// Center camera on player
 	e.updateCamera()
@@ -745,6 +780,8 @@ func (e *Engine) render() {
 	switch e.State {
 	case GameStatePaused:
 		e.renderPauseMenu()
+	case GameStateGameOver:
+		e.renderGameOver()
 	default:
 	}
 
@@ -756,6 +793,14 @@ func (e *Engine) renderPauseMenu() {
 	e.drawTextCentered(16, "Press [ESC] to Resume", core.White)
 	e.drawTextCentered(17, "Press [Q] to Quit", core.Gray)
 }
+
+func (e *Engine) renderGameOver() {
+	e.drawTextCentered(13, "=== CRITICAL FAILURE ===", core.Red)
+	e.drawTextCentered(15, "BIOSPHERE MAINTENANCE ENGINEER ELIMINATED", core.BrightWhite)
+	e.drawTextCentered(17, "Press [R] to Restore Checkpoint", core.Yellow)
+	e.drawTextCentered(18, "Press [M] to Abort to Main Menu", core.Gray)
+}
+
 
 func (e *Engine) populatePathLookup() {
 	clear(e.PathLookup)
