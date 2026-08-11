@@ -222,7 +222,7 @@ func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, 
 }
 
 func handleInteraction(
-	world *ecs.World,
+	w *ecs.World,
 	playerX, playerY int,
 	gameMap *world.Map,
 	activeMission *mission.MissionManifest,
@@ -236,8 +236,8 @@ func handleInteraction(
 	playerEntID := ecs.Entity(0)
 	foundPlayer := false
 	for i := range ecs.Entity(ecs.MaxEntities) {
-		if world.IsPlayer(i) {
-			playerClearance = world.PlayerControls[i].SecurityClearance
+		if w.IsPlayer(i) {
+			playerClearance = w.PlayerControls[i].SecurityClearance
 			playerEntID = i
 			foundPlayer = true
 			break
@@ -245,8 +245,8 @@ func handleInteraction(
 	}
 
 	for i := range ecs.Entity(ecs.MaxEntities) {
-		if world.HasPosition(i) && world.IsInteractable(i) {
-			pos := world.Positions[i]
+		if w.HasPosition(i) && w.IsInteractable(i) {
+			pos := w.Positions[i]
 			// Check adjacency
 			dx := pos.X - playerX
 			dy := pos.Y - playerY
@@ -254,17 +254,17 @@ func handleInteraction(
 
 			if distSq <= 2 {
 				switch {
-				case world.IsPowerGenerator(i):
-					interactWithGenerator(world, i, logFunc, audioFunc)
+				case w.IsPowerGenerator(i):
+					interactWithGenerator(w, i, logFunc, audioFunc)
 					return
-				case world.IsDoor(i):
-					interactWithDoor(world, i, playerClearance, logFunc, audioFunc)
+				case w.IsDoor(i):
+					interactWithDoor(w, i, playerClearance, logFunc, audioFunc)
 					return
-				case world.IsTerminal(i):
-					interactWithTerminal(world, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
+				case w.IsTerminal(i):
+					interactWithTerminal(w, i, playerEntID, foundPlayer, gameMap, activeMission, activeLevelID, logFunc, audioFunc)
 					return
-				case world.IsStairway(i):
-					interactWithStairway(world, i, playerClearance, logFunc, audioFunc, transitionFunc)
+				case w.IsStairway(i):
+					interactWithStairway(w, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
 				}
 			}
@@ -278,7 +278,7 @@ func handleInteraction(
 			ty := playerY + dy
 			tile := gameMap.GetTile(tx, ty)
 			if tile != nil && tile.PlantStage == world.PlantStageMature && foundPlayer {
-				playerCtrl := &world.PlayerControls[playerEntID]
+				playerCtrl := &w.PlayerControls[playerEntID]
 				if tile.YieldItemType == "O2_CAPSULE" {
 					playerCtrl.Survival.Oxygen = min(playerCtrl.Survival.MaxOxygen, playerCtrl.Survival.Oxygen+40.0)
 					logFunc("Harvested plant: Restored 40% Oxygen.")
@@ -300,6 +300,7 @@ func handleInteraction(
 		}
 	}
 }
+
 
 
 
