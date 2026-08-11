@@ -22,6 +22,7 @@ const (
 	MaskTerminal
 	MaskNarrative
 	MaskStairway
+	MaskHydroponics
 )
 
 // Stairway allows level transitions between maps when standing nearby and pressing [E].
@@ -43,6 +44,7 @@ const (
 	PlayerStatusHealthy PlayerStatus = iota
 	PlayerStatusSick
 	PlayerStatusHurt
+	PlayerStatusSuffocating
 )
 
 func (s PlayerStatus) Title() string {
@@ -53,9 +55,19 @@ func (s PlayerStatus) Title() string {
 		return "SICK / TOXIC"
 	case PlayerStatusHurt:
 		return "Hurt"
+	case PlayerStatusSuffocating:
+		return "SUFFOCATING"
 	default:
 		return "Unknown"
 	}
+}
+
+type PlayerSurvival struct {
+	Oxygen    float64
+	Toxicity  float64
+	MaxOxygen float64
+	Health    float64
+	MaxHealth float64
 }
 
 // Position holds exactly where an Entity is on the grid.
@@ -80,6 +92,7 @@ type PlayerControl struct {
 	CurrentPath       []entity.Point
 	Status            PlayerStatus
 	SecurityClearance uint32 // Bitmask of keys/clearances found
+	Survival          PlayerSurvival
 }
 
 // Glyph defines the graphical representation of an entity using a text character or emoji.
@@ -114,3 +127,19 @@ type Terminal struct {
 	HasSaved       bool
 	GrantClearance uint32 // Bit to unlock in player's clearance mask
 }
+
+type PlantStage uint8
+
+const (
+	PlantStageSeed PlantStage = iota
+	PlantStageSprout
+	PlantStageMature
+)
+
+type HydroponicsPlant struct {
+	Stage          PlantStage
+	GrowthProgress float64 // 0.0 to 100.0
+	GrowthRate     float64 // rate of growth per tick
+	YieldItemType  string  // e.g., "O2_CAPSULE" or "MEDPACK"
+}
+
