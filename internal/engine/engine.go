@@ -201,9 +201,17 @@ func (e *Engine) launchSelectedMission() {
 	if item.Manifest != nil {
 		e.ActiveMission = item.Manifest
 		e.ActiveLevelID = item.Manifest.StartLevel
-		e.loadLevelByID(e.ActiveLevelID, 0, false, true) // true = starting fresh, spawn at @
+		defaultSurvival := components.PlayerSurvival{
+			Oxygen:    100.0,
+			Toxicity:  0.0,
+			MaxOxygen: 100.0,
+			Health:    100.0,
+			MaxHealth: 100.0,
+		}
+		e.loadLevelByID(e.ActiveLevelID, 0, defaultSurvival, false, true) // true = starting fresh, spawn at @
 		return
 	}
+
 
 	// Procedural fallback: generate a random map
 	e.ActiveMission = nil
@@ -215,7 +223,7 @@ func (e *Engine) launchSelectedMission() {
 	e.State = GameStateRunning
 }
 
-func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool, isStart bool) {
+func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, existingSurvival components.PlayerSurvival, goingUp bool, isStart bool) {
 
 	if e.ActiveMission == nil {
 		return
@@ -267,6 +275,7 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 		for i := range ecs.Entity(ecs.MaxEntities) {
 			if e.EcsWorld.IsPlayer(i) {
 				e.EcsWorld.Positions[i] = components.Position{X: spawnX, Y: spawnY}
+				e.EcsWorld.PlayerControls[i].Survival = existingSurvival
 				break
 			}
 		}
@@ -308,6 +317,7 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 
 		e.ActiveLevelID = levelID
 		e.activateMap(loadedMap, spawnX, spawnY, e.ActiveMission, levelID)
+		e.transferPlayerSurvival(existingSurvival)
 		if existingClearance != 0 {
 			e.transferPlayerClearance(existingClearance)
 		}
@@ -317,6 +327,7 @@ func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp
 
 	e.Messages = append(e.Messages, fmt.Sprintf("ERROR: Level %q not found in mission", levelID))
 }
+
 
 // arrivalSpawnPos finds the elevator in the destination map that the player steps out of.
 // goingUp=true means player rode UP (<) so they arrive at the > elevator (IsUp=false).
@@ -361,6 +372,27 @@ func (e *Engine) playerClearance() uint32 {
 	}
 	return 0
 }
+
+// playerSurvival returns the current player's survival metrics.
+func (e *Engine) playerSurvival() (components.PlayerSurvival, bool) {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
+			return e.EcsWorld.PlayerControls[i].Survival, true
+		}
+	}
+	return components.PlayerSurvival{}, false
+}
+
+// transferPlayerSurvival copies survival attributes to the newly loaded player.
+func (e *Engine) transferPlayerSurvival(survival components.PlayerSurvival) {
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
+			e.EcsWorld.PlayerControls[i].Survival = survival
+			return
+		}
+	}
+}
+
 
 // buildMissionWorld constructs the ECS world for a given map.
 // manifest and levelID are optional — if provided, stairway entities are given
@@ -573,12 +605,11 @@ func (e *Engine) updateHeartbeat(dt float64) {
 		e.Audio.Play(audio.SoundHeartbeat)
 		e.heartbeatTimer = 0.0
 	}
-}
-
-
 func (e *Engine) processSimulation(events []core.InputEvent) {
-	// Capture clearance before processing so we can transfer it on level change
+	// Capture clearance and survival metrics before processing so we can transfer it on level change
+
 	clearanceBefore := e.playerClearance()
+	survivalBefore, _ := e.playerSurvival()
 
 	// Let the systems tick using the events we polled at the start of the frame!
 	systems.ProcessPlayerInput(e.EcsWorld, events, e.Map, e.ActiveMission, e.ActiveLevelID, func(msg string) {
@@ -594,11 +625,12 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	}, func(soundID string) {
 		e.Audio.Play(audio.SoundID(soundID))
 	}, func(targetLevelID string, goingUp bool) {
-		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp, false)
+		e.loadLevelByID(targetLevelID, clearanceBefore, survivalBefore, goingUp, false)
 	}, func() {
 		// Exported save callback triggers SaveState
 		systems.SaveState(e.EcsWorld, e.Map, e.ActiveMission, e.ActiveLevelID, e.Clock.TotalTicks, e.Clock.Day, uint8(e.Clock.Season))
 	})
+
 
 
 	// Run Life Support tick (deplete O2/gain Toxicity) and Hydroponics growth tick
