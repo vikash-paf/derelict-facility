@@ -48,6 +48,11 @@ func (s GameState) Flip() GameState {
 	return s
 }
 
+type LevelState struct {
+	Map      *world.Map
+	EcsWorld *ecs.World
+}
+
 type Engine struct {
 	Display       display.Display
 	Audio         *audio.AudioManager
@@ -66,6 +71,7 @@ type Engine struct {
 	Camera        rl.Camera2D
 	ActiveMission *mission.MissionManifest // nil if using procedural map
 	ActiveLevelID string                   // current level ID within the mission
+	LevelCache    map[string]*LevelState
 }
 
 func NewEngine(
@@ -89,6 +95,7 @@ func NewEngine(
 		TickerRate: time.Millisecond * 33, // ~30 fps
 		BaseTheme:  startingTheme,
 		Clock:      world.NewFacilityClock(),
+		LevelCache: make(map[string]*LevelState),
 		Camera: rl.Camera2D{
 			Zoom:   1.0,
 			Offset: rl.NewVector2(500, 300), // center of 1000x600 viewport
@@ -99,6 +106,7 @@ func NewEngine(
 		e.PathLookup = make([]bool, gameMap.Width*gameMap.Height)
 		e.Pathfinder = world.NewPathfinder(gameMap.Width, gameMap.Height)
 	}
+
 
 	return e
 }
@@ -166,15 +174,70 @@ func (e *Engine) launchSelectedMission() {
 	e.State = GameStateRunning
 }
 
-// loadLevelByID loads a specific level from the active mission manifest, preserving
-// the player's current security clearance across the transition.
-// goingUp indicates whether the player arrived via an ascending (<) or descending (>) elevator,
-// which determines which elevator in the destination they spawn next to.
 func (e *Engine) loadLevelByID(levelID string, existingClearance uint32, goingUp bool, isStart bool) {
+
 	if e.ActiveMission == nil {
 		return
 	}
 
+	// 1. Cache the current level state before transitioning
+	if e.ActiveLevelID != "" && e.Map != nil && e.EcsWorld != nil {
+		// Clean up the player's control path to avoid moving on arrival
+		for i := range ecs.Entity(ecs.MaxEntities) {
+			if e.EcsWorld.IsPlayer(i) {
+				e.EcsWorld.PlayerControls[i].CurrentPath = nil
+				e.EcsWorld.PlayerControls[i].Autopilot = false
+				break
+			}
+		}
+		e.LevelCache[e.ActiveLevelID] = &LevelState{
+			Map:      e.Map,
+			EcsWorld: e.EcsWorld,
+		}
+	}
+
+	// 2. Try loading the level state from cache
+	if cached, exists := e.LevelCache[levelID]; exists && !isStart {
+		// Level is already cached. Restore it!
+		e.ActiveLevelID = levelID
+		e.Map = cached.Map
+		e.EcsWorld = cached.EcsWorld
+		e.PathLookup = make([]bool, e.Map.Width*e.Map.Height)
+		e.Pathfinder = world.NewPathfinder(e.Map.Width, e.Map.Height)
+		e.Messages = nil
+
+		// Find player start or elevator spawn coordinate
+		var spawnX, spawnY int
+		// Resolve arrival coordinate on cached map
+		for _, lvl := range e.ActiveMission.Levels {
+			if lvl.ID == levelID {
+				data, err := e.ActiveMission.LoadLevelMapData(lvl.File)
+				if err == nil {
+					loader := world.NewJSONMapLoader()
+					if _, defX, defY, err := loader.LoadBytes(data); err == nil {
+						spawnX, spawnY = arrivalSpawnPos(e.Map, goingUp, defX, defY)
+					}
+				}
+				break
+			}
+		}
+
+		// Update cached player entity coordinates to the new elevator entry point
+		for i := range ecs.Entity(ecs.MaxEntities) {
+			if e.EcsWorld.IsPlayer(i) {
+				e.EcsWorld.Positions[i] = components.Position{X: spawnX, Y: spawnY}
+				break
+			}
+		}
+
+		if existingClearance != 0 {
+			e.transferPlayerClearance(existingClearance)
+		}
+		e.State = GameStateRunning
+		return
+	}
+
+	// 3. Fallback: Parse from map JSON file (First visit)
 	for _, lvl := range e.ActiveMission.Levels {
 		if lvl.ID != levelID {
 			continue
@@ -240,6 +303,7 @@ func (e *Engine) activateMap(gameMap *world.Map, playerX, playerY int, manifest 
 // transferPlayerClearance copies clearance bits from a previous level into the current ECS world player.
 func (e *Engine) transferPlayerClearance(clearance uint32) {
 	for i := range ecs.Entity(ecs.MaxEntities) {
+
 		if e.EcsWorld.IsPlayer(i) {
 			e.EcsWorld.PlayerControls[i].SecurityClearance = clearance
 			return
@@ -451,7 +515,11 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 		e.Audio.Play(audio.SoundID(soundID))
 	}, func(targetLevelID string, goingUp bool) {
 		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp, false)
+	}, func() {
+		// Exported save callback triggers SaveState
+		systems.SaveState(e.EcsWorld, e.Map, e.ActiveMission, e.ActiveLevelID, e.Clock.TotalTicks, e.Clock.Day, uint8(e.Clock.Season))
 	})
+
 
 	// Run Life Support tick (deplete O2/gain Toxicity) and Hydroponics growth tick
 	systems.ProcessLifeSupport(e.EcsWorld, e.Map, e.Clock, func(msg string) {
