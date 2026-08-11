@@ -31,7 +31,6 @@ type Stairway struct {
 	IsUp              bool   // true for '<' (Up), false for '>' (Down)
 }
 
-
 // Narrative stores flavor text or logs associated with an entity.
 type Narrative struct {
 	Text string
@@ -127,5 +126,3 @@ type Terminal struct {
 	HasSaved       bool
 	GrantClearance uint32 // Bit to unlock in player's clearance mask
 }
-
-

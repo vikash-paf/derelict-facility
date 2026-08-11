@@ -116,7 +116,6 @@ func (f FacilityGenerator) Generate(width, height int) (*Map, int, int) {
 				}
 			}
 
-
 		} else {
 			prevRoom := rooms[len(rooms)-1]
 			prevX, prevY := prevRoom.Center()

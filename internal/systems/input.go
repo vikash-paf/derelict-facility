@@ -62,7 +62,6 @@ func ProcessPlayerInput(w *ecs.World, events []core.InputEvent, gameMap *world.M
 				handleInteraction(w, positions.X, positions.Y, gameMap, activeMission, activeLevelID, logFunc, audioFunc, transitionFunc, saveFunc)
 			}
 
-
 			// Disable autopilot if manual movement keys are pressed
 			if dx != 0 || dy != 0 {
 				if controls.Autopilot {
@@ -168,7 +167,6 @@ func interactWithDoor(w *ecs.World, ent ecs.Entity, playerClearance uint32, logF
 func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, gameMap *world.Map, activeMission *mission.MissionManifest, activeLevelID string, logFunc func(string), audioFunc func(string), saveFunc func()) {
 	terminal := &w.Terminals[ent]
 
-
 	if audioFunc != nil {
 		audioFunc("terminal_access")
 	}
@@ -198,7 +196,6 @@ func interactWithTerminal(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, 
 		logFunc("Checkpoint saved.")
 	}
 }
-
 
 func interactWithStairway(w *ecs.World, ent ecs.Entity, playerClearance uint32, logFunc func(string), audioFunc func(string), transitionFunc func(string, bool)) {
 	stair := &w.Stairways[ent]
@@ -277,7 +274,6 @@ func handleInteraction(
 		}
 	}
 
-
 	// Check if player is standing on or adjacent to a harvestable map-tile plant
 	for dy := -1; dy <= 1; dy++ {
 		for dx := -1; dx <= 1; dx++ {
@@ -307,9 +303,6 @@ func handleInteraction(
 		}
 	}
 }
-
-
-
 
 // IsPowerActive returns true if at least one global generator is active.
 func IsPowerActive(w *ecs.World) bool {

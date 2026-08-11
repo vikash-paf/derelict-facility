@@ -15,9 +15,9 @@ type SaveGameData struct {
 	ActiveMission *mission.MissionManifest
 	ActiveLevelID string
 	// Save persistent caches
-	TotalTicks    uint64
-	Day           int
-	Season        uint8
+	TotalTicks uint64
+	Day        int
+	Season     uint8
 }
 
 func SaveState(w *ecs.World, m *world.Map, activeMission *mission.MissionManifest, activeLevelID string, ticks uint64, day int, season uint8) {
@@ -36,7 +36,6 @@ func SaveState(w *ecs.World, m *world.Map, activeMission *mission.MissionManifes
 		Day:           day,
 		Season:        season,
 	}
-
 
 	encoder := gob.NewEncoder(file)
 	encoder.Encode(data)

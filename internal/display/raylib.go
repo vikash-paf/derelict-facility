@@ -316,7 +316,6 @@ func (r *RaylibDisplay) PollInput() []core.InputEvent {
 	return events
 }
 
-
 // DarkenColor takes a core.Color and reduces its brightness by the given factor.
 func DarkenColor(color core.Color, factor uint8) core.Color {
 	if factor <= 1 {

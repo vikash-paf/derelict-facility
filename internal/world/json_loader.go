@@ -66,16 +66,15 @@ func (l *JSONMapLoader) LoadBytes(data []byte) (*Map, int, int, error) {
 					yield = "MEDPACK"
 				}
 				m.SetTile(x, y, Tile{
-					Type:              TileTypeFloor,
-					Walkable:          true,
-					IsSunlit:          true,
-					Variant:           1,
-					PlantStage:        PlantStageSeed,
-					GrowthProgress:    0.0,
-					GrowthRate:        1.5,
-					YieldItemType:     yield,
+					Type:           TileTypeFloor,
+					Walkable:       true,
+					IsSunlit:       true,
+					Variant:        1,
+					PlantStage:     PlantStageSeed,
+					GrowthProgress: 0.0,
+					GrowthRate:     1.5,
+					YieldItemType:  yield,
 				})
-
 
 			case '+': // Door
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})

@@ -35,7 +35,6 @@ type Tile struct {
 	YieldItemType  string
 }
 
-
 // Cardinal Wall Connection Bitmasks
 const (
 	WallConnectionNone  uint8 = 0

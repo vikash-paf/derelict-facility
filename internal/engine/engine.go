@@ -599,13 +599,17 @@ func (e *Engine) updateHeartbeat(dt float64) {
 	minInterval := 0.4
 	maxInterval := 1.5
 	interval := maxInterval - (severity * (maxInterval - minInterval))
-
 	e.heartbeatTimer += dt
 	if e.heartbeatTimer >= interval {
 		e.Audio.Play(audio.SoundHeartbeat)
 		e.heartbeatTimer = 0.0
 	}
+
+}
+
+
 func (e *Engine) processSimulation(events []core.InputEvent) {
+
 	// Capture clearance and survival metrics before processing so we can transfer it on level change
 
 	clearanceBefore := e.playerClearance()

@@ -161,5 +161,3 @@ func (w *World) IsSolid(e Entity) bool {
 func (w *World) IsInteractable(e Entity) bool {
 	return (w.Masks[e] & components.MaskInteractable) != 0
 }
-
-
