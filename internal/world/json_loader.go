@@ -59,7 +59,21 @@ func (l *JSONMapLoader) LoadBytes(data []byte) (*Map, int, int, error) {
 			case '.': // Floor
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 			case 'S', '*': // Skylight Glass Roof Floor
-				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, IsSunlit: true, Variant: 1})
+				yield := "O2_CAPSULE"
+				if (x+y)%2 == 0 {
+					yield = "MEDPACK"
+				}
+				m.SetTile(x, y, Tile{
+					Type:              TileTypeFloor,
+					Walkable:          true,
+					IsSunlit:          true,
+					Variant:           1,
+					PlantStage:        PlantStageSeed,
+					GrowthProgress:    0.0,
+					GrowthRate:        1.5,
+					YieldItemType:     yield,
+				})
+
 			case '+': // Door
 				m.SetTile(x, y, Tile{Type: TileTypeFloor, Walkable: true, Variant: 1})
 				doors = append(doors, entity.Point{X: x, Y: y})

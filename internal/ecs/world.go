@@ -27,7 +27,6 @@ type World struct {
 	Terminals       [MaxEntities]components.Terminal
 	Narratives      [MaxEntities]components.Narrative
 	Stairways       [MaxEntities]components.Stairway
-	Hydroponics     [MaxEntities]components.HydroponicsPlant
 }
 
 func NewWorld() *World {
@@ -126,12 +125,6 @@ func (w *World) AddStairway(entity Entity, stairway components.Stairway) {
 	w.Stairways[entity] = stairway
 }
 
-// AddHydroponics adds a Hydroponics component to an entity.
-func (w *World) AddHydroponics(entity Entity, plant components.HydroponicsPlant) {
-	w.Masks[entity] |= components.MaskHydroponics
-	w.Hydroponics[entity] = plant
-}
-
 // RemoveTerminal removes the Terminal component from an entity.
 func (w *World) RemoveTerminal(entity Entity) {
 	w.Masks[entity] &^= components.MaskTerminal
@@ -157,10 +150,6 @@ func (w *World) IsStairway(e Entity) bool {
 	return (w.Masks[e] & components.MaskStairway) != 0
 }
 
-func (w *World) IsHydroponics(e Entity) bool {
-	return (w.Masks[e] & components.MaskHydroponics) != 0
-}
-
 func (w *World) HasPosition(e Entity) bool {
 	return (w.Masks[e] & components.MaskPosition) != 0
 }
@@ -172,4 +161,5 @@ func (w *World) IsSolid(e Entity) bool {
 func (w *World) IsInteractable(e Entity) bool {
 	return (w.Masks[e] & components.MaskInteractable) != 0
 }
+
 

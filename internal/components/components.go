@@ -22,7 +22,6 @@ const (
 	MaskTerminal
 	MaskNarrative
 	MaskStairway
-	MaskHydroponics
 )
 
 // Stairway allows level transitions between maps when standing nearby and pressing [E].
@@ -31,6 +30,7 @@ type Stairway struct {
 	RequiredClearance uint32 // 0 for unlocked, otherwise required bitmask
 	IsUp              bool   // true for '<' (Up), false for '>' (Down)
 }
+
 
 // Narrative stores flavor text or logs associated with an entity.
 type Narrative struct {
@@ -128,18 +128,4 @@ type Terminal struct {
 	GrantClearance uint32 // Bit to unlock in player's clearance mask
 }
 
-type PlantStage uint8
-
-const (
-	PlantStageSeed PlantStage = iota
-	PlantStageSprout
-	PlantStageMature
-)
-
-type HydroponicsPlant struct {
-	Stage          PlantStage
-	GrowthProgress float64 // 0.0 to 100.0
-	GrowthRate     float64 // rate of growth per tick
-	YieldItemType  string  // e.g., "O2_CAPSULE" or "MEDPACK"
-}
 

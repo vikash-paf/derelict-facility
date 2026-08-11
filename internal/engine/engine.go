@@ -282,58 +282,12 @@ func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *missi
 	spawnTerminals(ecsWorld, gameMap)
 	spawnDoors(ecsWorld, gameMap, playerX, playerY)
 	spawnStairways(ecsWorld, gameMap, manifest, levelID)
-	spawnHydroponics(ecsWorld, gameMap)
 
 	return ecsWorld
 }
 
-func spawnHydroponics(w *ecs.World, gameMap *world.Map) {
-	// Find sunlit tiles ('S' / '*') and spawn hydroponics plants sparsely
-	for y := 0; y < gameMap.Height; y++ {
-		for x := 0; x < gameMap.Width; x++ {
-			tile := gameMap.GetTile(x, y)
-			if tile != nil && tile.IsSunlit && tile.Type == world.TileTypeFloor {
-				// Spawn only on 1 out of 10 sunlit tiles to prevent MaxEntities overflow
-				if (x*7+y*13)%10 != 0 {
-					continue
-				}
-
-				// Don't spawn if there's already an entity there
-				isOccupied := false
-				for i := range ecs.Entity(ecs.MaxEntities) {
-					if w.HasPosition(i) {
-						pos := w.Positions[i]
-						if pos.X == x && pos.Y == y {
-							isOccupied = true
-							break
-						}
-					}
-				}
-				if isOccupied {
-					continue
-				}
-
-				// Pick yields based on coords to mix it up
-				yield := "O2_CAPSULE"
-				if (x+y)%2 == 0 {
-					yield = "MEDPACK"
-				}
-
-				plantEnt := w.CreateEntity()
-				w.AddPosition(plantEnt, components.Position{X: x, Y: y})
-				w.AddGlyph(plantEnt, components.Glyph{Char: ".", Color: core.Color{R: 50, G: 120, B: 50, A: 255}})
-				w.AddHydroponics(plantEnt, components.HydroponicsPlant{
-					Stage:          components.PlantStageSeed,
-					GrowthProgress: 0.0,
-					GrowthRate:     1.5,
-					YieldItemType:  yield,
-				})
-			}
-		}
-	}
-}
-
 func spawnGenerators(w *ecs.World, gameMap *world.Map) {
+
 
 	for _, genInfo := range gameMap.PowerGenerators {
 		genEnt := w.CreateEntity()
@@ -810,14 +764,37 @@ func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.Ti
 }
 
 func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileVariant) {
-	char, color := theme[tile.Type].Char, theme[tile.Type].Color
-
 	if tile.Type == world.TileTypeFloor {
 		bgColor := e.getFloorBackgroundColor(x, y, tile)
 		e.Display.DrawRect(x, y, bgColor)
+
+		// Draw plant overlay if present
+		if tile.PlantStage != world.PlantStageNone {
+			char, color := ".", core.Color{R: 50, G: 120, B: 50, A: 255}
+			if tile.PlantStage == world.PlantStageSprout {
+				char, color = "v", core.Color{R: 120, G: 200, B: 120, A: 255}
+			} else if tile.PlantStage == world.PlantStageMature {
+				char, color = "♣", core.Color{R: 50, G: 240, B: 50, A: 255}
+			}
+			
+			// Highlight mature plants with bright yellow interaction hint if adjacent to player
+			ctrl, pos, found := e.getPlayerControlAndPosition()
+			if found && tile.PlantStage == world.PlantStageMature {
+				dx := pos.X - x
+				dy := pos.Y - y
+				if dx*dx + dy*dy <= 2 {
+					if e.tickCount%30 < 15 {
+						color = core.Yellow
+					}
+				}
+			}
+
+			e.Display.DrawText(x, y, char, color)
+		}
 		return
 	}
 
+	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 	if tile.Type == world.TileTypeWall {
 		char, color = e.getWallGlyphAndColor(x, y, tile, theme)
 	}
@@ -839,6 +816,18 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.TileVariant) {
 	if tile.Type == world.TileTypeFloor {
 		e.Display.DrawRect(x, y, core.Color{R: 8, G: 8, B: 12, A: 255})
+		
+		// Render dim plants in fog of war
+		if tile.PlantStage != world.PlantStageNone {
+			char := "."
+			if tile.PlantStage == world.PlantStageSprout {
+				char = "v"
+			} else if tile.PlantStage == world.PlantStageMature {
+				char = "♣"
+			}
+			dimColor := core.Color{R: 20, G: 50, B: 20, A: 255}
+			e.Display.DrawText(x, y, char, dimColor)
+		}
 		return
 	}
 
@@ -850,6 +839,7 @@ func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.Tile
 	dimColor := display.DarkenColor(color, 4)
 	e.Display.DrawText(x, y, char, dimColor)
 }
+
 
 func (e *Engine) renderSingleMapTile(x, y int, theme world.TileVariant) {
 	tile := e.Map.GetTile(x, y)
@@ -895,6 +885,18 @@ func (e *Engine) getPlayerControlAndPosition() (*components.PlayerControl, *comp
 }
 
 func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
+	// First check adjacent map-tile plants
+	for dy := -1; dy <= 1; dy++ {
+		for dx := -1; dx <= 1; dx++ {
+			tx := pX + dx
+			ty := pY + dy
+			tile := e.Map.GetTile(tx, ty)
+			if tile != nil && tile.PlantStage == world.PlantStageMature {
+				return "Press [E] to Harvest Crop"
+			}
+		}
+	}
+
 	for j := range ecs.Entity(ecs.MaxEntities) {
 		if e.EcsWorld.HasPosition(j) && e.EcsWorld.IsInteractable(j) {
 			targetPos := e.EcsWorld.Positions[j]
@@ -907,6 +909,7 @@ func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
 	}
 	return ""
 }
+
 
 func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool, survival components.PlayerSurvival) {
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
