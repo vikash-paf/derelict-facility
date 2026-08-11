@@ -266,11 +266,55 @@ func handleInteraction(
 				case world.IsStairway(i):
 					interactWithStairway(world, i, playerClearance, logFunc, audioFunc, transitionFunc)
 					return
+				case world.IsHydroponics(i):
+					interactWithHydroponics(world, i, playerEntID, foundPlayer, logFunc, audioFunc)
+					return
 				}
 			}
 		}
 	}
 }
+
+func interactWithHydroponics(w *ecs.World, ent ecs.Entity, playerEntID ecs.Entity, foundPlayer bool, logFunc func(string), audioFunc func(string)) {
+	plant := &w.Hydroponics[ent]
+	if plant.Stage != components.PlantStageMature {
+		logFunc("This plant is still growing.")
+		return
+	}
+
+	if !foundPlayer {
+		return
+	}
+
+	// Apply benefits to the player
+	playerCtrl := &w.PlayerControls[playerEntID]
+	if plant.YieldItemType == "O2_CAPSULE" {
+		playerCtrl.Survival.Oxygen = min(playerCtrl.Survival.MaxOxygen, playerCtrl.Survival.Oxygen+40.0)
+		logFunc("Harvested plant: Restored 40% Oxygen.")
+		if audioFunc != nil {
+			audioFunc("generator_toggle") // reuse generator click as item pickup SFX
+		}
+	} else if plant.YieldItemType == "MEDPACK" {
+		playerCtrl.Survival.Toxicity = max(0.0, playerCtrl.Survival.Toxicity-30.0)
+		playerCtrl.Survival.Health = min(playerCtrl.Survival.MaxHealth, playerCtrl.Survival.Health+25.0)
+		logFunc("Harvested plant: Treated toxicity (-30%) and healed 25 HP.")
+		if audioFunc != nil {
+			audioFunc("generator_toggle")
+		}
+	}
+
+	// Reset growth
+	plant.Stage = components.PlantStageSeed
+	plant.GrowthProgress = 0.0
+	w.Interactables[ent].Prompt = "Growing plant..."
+	w.RemoveInteractable(ent)
+
+	if (w.Masks[ent] & components.MaskGlyph) != 0 {
+		w.Glyphs[ent].Char = "."
+		w.Glyphs[ent].Color = core.Color{R: 50, G: 120, B: 50, A: 255}
+	}
+}
+
 
 // IsPowerActive returns true if at least one global generator is active.
 func IsPowerActive(w *ecs.World) bool {
