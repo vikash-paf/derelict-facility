@@ -20,8 +20,8 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 			isSunlit := tile != nil && tile.SunlightIntensity > 0.0 && clock.IsDaytime()
 
 			if isPowered || isSunlit {
-				// Breathing safely: restore O2 and clean toxins
-				survival.Oxygen = min(survival.MaxOxygen, survival.Oxygen+0.6)
+				// Breathing safely: restore O2 and clean toxins at a moderate pace
+				survival.Oxygen = min(survival.MaxOxygen, survival.Oxygen+0.25)
 				if survival.Toxicity > 0 {
 					// Faster toxin clearing when breathing safely
 					survival.Toxicity = max(0.0, survival.Toxicity-0.2)
@@ -29,11 +29,12 @@ func ProcessLifeSupport(w *ecs.World, gameMap *world.Map, clock *world.FacilityC
 				if playerCtrl.Status == components.PlayerStatusSuffocating {
 					playerCtrl.Status = components.PlayerStatusHealthy
 				}
-
-				// Passive health recovery: regenerate health slowly (+1 HP per 3 ticks) in safe zones if clean of toxins
+				
+				// Passive health recovery: regenerate health slowly (+0.12 HP/tick) in safe zones if clean of toxins
 				if survival.Toxicity == 0.0 && survival.Health < survival.MaxHealth {
-					survival.Health = min(survival.MaxHealth, survival.Health+0.35)
+					survival.Health = min(survival.MaxHealth, survival.Health+0.12)
 				}
+
 			} else {
 				// Dangerous dark/unpowered zone: deplete O2 more slowly (0.08 down from 0.15)
 				survival.Oxygen = max(0.0, survival.Oxygen-0.08)
