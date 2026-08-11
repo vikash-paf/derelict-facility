@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -74,6 +75,7 @@ type Engine struct {
 	ActiveMission *mission.MissionManifest // nil if using procedural map
 	ActiveLevelID string                   // current level ID within the mission
 	LevelCache    map[string]*LevelState
+	heartbeatTimer float64
 }
 
 func NewEngine(
@@ -532,8 +534,46 @@ func (e *Engine) Update(events []core.InputEvent) {
 	case GameStateRunning:
 		e.Clock.Tick()
 		e.processSimulation(events)
+		e.updateHeartbeat(0.033) // ~30 fps delta time is 33ms
 	}
 }
+
+func (e *Engine) updateHeartbeat(dt float64) {
+	ctrl, _, found := e.getPlayerControlAndPosition()
+	if !found {
+		return
+	}
+
+	healthPct := ctrl.Survival.Health / 100.0
+	toxPct := ctrl.Survival.Toxicity / 100.0
+
+	// Trigger audio warnings if health drops below 35% or toxicity goes above 40%
+	isCritical := healthPct < 0.35 || toxPct > 0.40
+	if !isCritical {
+		e.heartbeatTimer = 0
+		return
+	}
+
+	severity := 0.0
+	if healthPct < 0.35 {
+		severity = math.Max(severity, (0.35-healthPct)/0.35)
+	}
+	if toxPct > 0.40 {
+		severity = math.Max(severity, (toxPct-0.40)/0.60)
+	}
+
+	// Dynamic tempo mapping: 1.5 seconds down to 0.4 seconds pacing speed
+	minInterval := 0.4
+	maxInterval := 1.5
+	interval := maxInterval - (severity * (maxInterval - minInterval))
+
+	e.heartbeatTimer += dt
+	if e.heartbeatTimer >= interval {
+		e.Audio.Play(audio.SoundHeartbeat)
+		e.heartbeatTimer = 0.0
+	}
+}
+
 
 func (e *Engine) processSimulation(events []core.InputEvent) {
 	// Capture clearance before processing so we can transfer it on level change
@@ -742,6 +782,19 @@ func (e *Engine) updateCamera() {
 	if e.Map != nil {
 		e.clampCameraToMap(cellWidthVal, cellHeightVal)
 	}
+
+	// Apply disorientation wobble/sway if player has SICK status (from toxicity)
+	ctrl, _, controlFound := e.getPlayerControlAndPosition()
+	if controlFound && ctrl.Status == components.PlayerStatusSick {
+		t := float32(rl.GetTime())
+		// Wobble camera target position with wave combinations
+		e.Camera.Target.X += float32(math.Sin(float64(t*2.0))) * 12.0
+		e.Camera.Target.Y += float32(math.Cos(float64(t*1.5))) * 12.0
+		// Apply slight camera rotational roll (tilt)
+		e.Camera.Rotation = float32(math.Sin(float64(t*1.0))) * 2.5
+	} else {
+		e.Camera.Rotation = 0.0
+	}
 }
 
 // render updates the game screen by drawing the map, GameState overlays,
@@ -820,6 +873,22 @@ func (e *Engine) populatePathLookup() {
 	}
 }
 
+func (e *Engine) getFlickerMultiplier(x, y int) float32 {
+	t := float64(e.tickCount)
+	// Compute offset wave patterns based on coordinate and time to differentiate rooms
+	wave := math.Sin(t*0.25+float64(x)*0.3) * math.Cos(t*0.18+float64(y)*0.4)
+	wave = (wave + 1.0) * 0.5
+
+	// Sudden emergency power sparks or dim glow
+	if wave > 0.88 {
+		return 0.15 // sudden darkness drop
+	}
+	if wave > 0.75 {
+		return 0.50 // dim light pulse
+	}
+	return 1.0 // full ambient light
+}
+
 func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color {
 	bgColor := core.Color{R: 20, G: 20, B: 25, A: 255} // base floor dark fill
 	sunColor := e.Clock.GetSunlightColor()
@@ -831,6 +900,15 @@ func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color 
 	isTilePowered := systems.IsPowerActiveAt(e.EcsWorld, e.Map, x, y)
 	isSunlitByDay := tile.SunlightIntensity > 0.0 && e.Clock.IsDaytime()
 	if !isTilePowered && !isSunlitByDay {
+		// Apply backup flickering FX to emergency lights
+		flicker := e.getFlickerMultiplier(x, y)
+		bgColor = core.Color{
+			R: uint8(float32(bgColor.R) * flicker),
+			G: uint8(float32(bgColor.G) * flicker),
+			B: uint8(float32(bgColor.B) * flicker),
+			A: bgColor.A,
+		}
+
 		if tile.Distance > 3 {
 			bgColor = display.DarkenColor(bgColor, 2)
 		}
@@ -840,6 +918,7 @@ func (e *Engine) getFloorBackgroundColor(x, y int, tile *world.Tile) core.Color 
 	}
 	return bgColor
 }
+
 
 func (e *Engine) getWallGlyphAndColor(x, y int, tile *world.Tile, theme world.TileVariant) (string, core.Color) {
 	char, color := theme[tile.Type].Char, theme[tile.Type].Color
