@@ -162,8 +162,11 @@ func (e *Engine) handleGameOverInput(events []core.InputEvent) {
 				
 				e.Messages = []string{"Checkpoint restored successfully."}
 				e.State = GameStateRunning
+				fmt.Println("Checkpoint restored successfully from savegame.sav")
 			} else {
-				e.Messages = []string{"No saved checkpoint found."}
+				errMsg := fmt.Sprintf("Load checkpoint failed: %v", err)
+				e.Messages = []string{errMsg}
+				fmt.Println(errMsg)
 			}
 		}
 		if event.Key == rl.KeyM {
@@ -171,6 +174,7 @@ func (e *Engine) handleGameOverInput(events []core.InputEvent) {
 		}
 	}
 }
+
 
 
 func (e *Engine) handleMainMenuInput(events []core.InputEvent) {
