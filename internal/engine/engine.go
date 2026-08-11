@@ -770,11 +770,15 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 
 		// Draw plant overlay if present
 		if tile.PlantStage != world.PlantStageNone {
-			char, color := ".", core.Color{R: 50, G: 120, B: 50, A: 255}
+			char, color := "h", core.Color{R: 50, G: 120, B: 50, A: 255}
 			if tile.PlantStage == world.PlantStageSprout {
-				char, color = "v", core.Color{R: 120, G: 200, B: 120, A: 255}
+				char, color = "y", core.Color{R: 120, G: 200, B: 120, A: 255}
 			} else if tile.PlantStage == world.PlantStageMature {
-				char, color = "♣", core.Color{R: 50, G: 240, B: 50, A: 255}
+				char, color = "H", core.Color{R: 50, G: 240, B: 50, A: 255}
+				// Use different colors to distinguish yields (O2 vs Medpack)
+				if tile.YieldItemType == "MEDPACK" {
+					color = core.Color{R: 240, G: 50, B: 240, A: 255} // purple-magenta for medical
+				}
 			}
 			
 			// Highlight mature plants with bright yellow interaction hint if adjacent to player
@@ -788,7 +792,6 @@ func (e *Engine) renderVisibleTile(x, y int, tile *world.Tile, theme world.TileV
 					}
 				}
 			}
-
 
 			e.Display.DrawText(x, y, char, color)
 		}
@@ -820,17 +823,18 @@ func (e *Engine) renderExploredTile(x, y int, tile *world.Tile, theme world.Tile
 		
 		// Render dim plants in fog of war
 		if tile.PlantStage != world.PlantStageNone {
-			char := "."
+			char := "h"
 			if tile.PlantStage == world.PlantStageSprout {
-				char = "v"
+				char = "y"
 			} else if tile.PlantStage == world.PlantStageMature {
-				char = "♣"
+				char = "H"
 			}
 			dimColor := core.Color{R: 20, G: 50, B: 20, A: 255}
 			e.Display.DrawText(x, y, char, dimColor)
 		}
 		return
 	}
+
 
 	char, color := theme[tile.Type].Char, theme[tile.Type].Color
 	if tile.Type == world.TileTypeWall {
