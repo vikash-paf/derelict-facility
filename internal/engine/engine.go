@@ -269,17 +269,67 @@ func buildMissionWorld(gameMap *world.Map, playerX, playerY int, manifest *missi
 	ecsWorld.AddPlayerControl(playerEnt, components.PlayerControl{
 		Autopilot: false,
 		Status:    components.PlayerStatusHealthy,
+		Survival: components.PlayerSurvival{
+			Oxygen:    100.0,
+			Toxicity:  0.0,
+			MaxOxygen: 100.0,
+			Health:    100.0,
+			MaxHealth: 100.0,
+		},
 	})
 
 	spawnGenerators(ecsWorld, gameMap)
 	spawnTerminals(ecsWorld, gameMap)
 	spawnDoors(ecsWorld, gameMap, playerX, playerY)
 	spawnStairways(ecsWorld, gameMap, manifest, levelID)
+	spawnHydroponics(ecsWorld, gameMap)
 
 	return ecsWorld
 }
 
+func spawnHydroponics(w *ecs.World, gameMap *world.Map) {
+	// Find sunlit tiles ('S' / '*') and spawn hydroponics plants there
+	for y := 0; y < gameMap.Height; y++ {
+		for x := 0; x < gameMap.Width; x++ {
+			tile := gameMap.GetTile(x, y)
+			if tile != nil && tile.IsSunlit && tile.Type == world.TileTypeFloor {
+				// Don't spawn if there's already an entity there
+				isOccupied := false
+				for i := range ecs.Entity(ecs.MaxEntities) {
+					if w.HasPosition(i) {
+						pos := w.Positions[i]
+						if pos.X == x && pos.Y == y {
+							isOccupied = true
+							break
+						}
+					}
+				}
+				if isOccupied {
+					continue
+				}
+
+				// Pick yields based on coords to mix it up
+				yield := "O2_CAPSULE"
+				if (x+y)%2 == 0 {
+					yield = "MEDPACK"
+				}
+
+				plantEnt := w.CreateEntity()
+				w.AddPosition(plantEnt, components.Position{X: x, Y: y})
+				w.AddGlyph(plantEnt, components.Glyph{Char: ".", Color: core.Color{R: 50, G: 120, B: 50, A: 255}})
+				w.AddHydroponics(plantEnt, components.HydroponicsPlant{
+					Stage:          components.PlantStageSeed,
+					GrowthProgress: 0.0,
+					GrowthRate:     1.5,
+					YieldItemType:  yield,
+				})
+			}
+		}
+	}
+}
+
 func spawnGenerators(w *ecs.World, gameMap *world.Map) {
+
 	for _, genInfo := range gameMap.PowerGenerators {
 		genEnt := w.CreateEntity()
 		w.AddPosition(genEnt, components.Position{X: genInfo.Pos.X, Y: genInfo.Pos.Y})
@@ -443,6 +493,31 @@ func (e *Engine) processSimulation(events []core.InputEvent) {
 	}, func(targetLevelID string, goingUp bool) {
 		e.loadLevelByID(targetLevelID, clearanceBefore, goingUp, false)
 	})
+
+	// Run Life Support tick (deplete O2/gain Toxicity) and Hydroponics growth tick
+	systems.ProcessLifeSupport(e.EcsWorld, e.Map, e.Clock, func(msg string) {
+		if len(e.Messages) > 0 && e.Messages[len(e.Messages)-1] == msg {
+			return
+		}
+		e.Messages = append(e.Messages, msg)
+		if len(e.Messages) > 3 {
+			e.Messages = e.Messages[1:]
+		}
+	})
+
+	systems.ProcessHydroponics(e.EcsWorld, e.Map, e.Clock)
+
+	// Check if player health reaches 0 (Game Over)
+	for i := range ecs.Entity(ecs.MaxEntities) {
+		if e.EcsWorld.IsPlayer(i) {
+			if e.EcsWorld.PlayerControls[i].Survival.Health <= 0.0 {
+				e.Messages = append(e.Messages, "CRITICAL ERROR: BIOSPHERE ENGINEER ELIMINATED.")
+				// Reset player to safe values and bounce back to main menu
+				e.State = GameStateMainMenu
+			}
+			break
+		}
+	}
 
 	// Center camera on player
 	e.updateCamera()
@@ -828,13 +903,35 @@ func (e *Engine) getNearbyInteractionPrompt(pX, pY int) string {
 	return ""
 }
 
-func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool) {
+func (e *Engine) drawHUDStatusAndNav(hudY int, statusText string, autopilotEngaged bool, survival components.PlayerSurvival) {
 	e.drawText(2, hudY+1, fmt.Sprintf(" STATUS: %s ", statusText), core.Cyan)
-	if autopilotEngaged {
-		e.drawText(22, hudY+1, "[ NAV-COM: AUTOPILOT ENGAGED ]", core.Red)
-	} else {
-		e.drawText(22, hudY+1, "[ NAV-COM: MANUAL OVERRIDE ]  ", core.Gray)
+
+	// Draw Health, O2, and Toxicity Gauges
+	hpFill := int(survival.Health / 10.0)
+	o2Fill := int(survival.Oxygen / 10.0)
+	toxFill := int(survival.Toxicity / 10.0)
+
+	hpBar := strings.Repeat("█", hpFill) + strings.Repeat("░", 10-hpFill)
+	o2Bar := strings.Repeat("█", o2Fill) + strings.Repeat("░", 10-o2Fill)
+	toxBar := strings.Repeat("█", toxFill) + strings.Repeat("░", 10-toxFill)
+
+	e.drawText(22, hudY+1, fmt.Sprintf("HP  [%s] %3.0f%%", hpBar, survival.Health), core.Green)
+	
+	o2Color := core.Green
+	if survival.Oxygen < 30.0 {
+		o2Color = core.Red
+	} else if survival.Oxygen < 60.0 {
+		o2Color = core.Yellow
 	}
+	e.drawText(46, hudY+1, fmt.Sprintf("O2  [%s] %3.0f%%", o2Bar, survival.Oxygen), o2Color)
+
+	toxColor := core.Gray
+	if survival.Toxicity > 50.0 {
+		toxColor = core.Red
+	} else if survival.Toxicity > 20.0 {
+		toxColor = core.Yellow
+	}
+	e.drawText(70, hudY+1, fmt.Sprintf("TOX [%s] %3.0f%%", toxBar, survival.Toxicity), toxColor)
 }
 
 func (e *Engine) drawHUDMissionAndClock(hudY int) {
@@ -851,7 +948,7 @@ func (e *Engine) drawHUDMissionAndClock(hudY int) {
 	if clockX < 55 {
 		clockX = 55
 	}
-	e.drawText(clockX, hudY+1, clockText, core.Yellow)
+	e.drawText(clockX, hudY+2, clockText, core.Yellow)
 }
 
 func (e *Engine) drawHUDInteractionPrompt(hudY int, interactPrompt string) {
@@ -894,16 +991,16 @@ func (e *Engine) renderHUD() {
 	ctrl, pos, found := e.getPlayerControlAndPosition()
 
 	statusText := "HEALTHY"
-	autopilotEngaged := false
 	var interactPrompt string
+	var survival components.PlayerSurvival
 
 	if found {
 		statusText = ctrl.Status.Title()
-		autopilotEngaged = ctrl.Autopilot
 		interactPrompt = e.getNearbyInteractionPrompt(pos.X, pos.Y)
+		survival = ctrl.Survival
 	}
 
-	e.drawHUDStatusAndNav(hudY, statusText, autopilotEngaged)
+	e.drawHUDStatusAndNav(hudY, statusText, ctrl.Autopilot, survival)
 	e.drawHUDMissionAndClock(hudY)
 	e.drawHUDInteractionPrompt(hudY, interactPrompt)
 	e.drawHUDMessages(hudY)
@@ -920,3 +1017,4 @@ func (e *Engine) drawTextCentered(y int, text string, color core.Color) {
 func (e *Engine) drawText(x, y int, text string, color core.Color) {
 	e.Display.DrawText(x, y, text, color)
 }
+
